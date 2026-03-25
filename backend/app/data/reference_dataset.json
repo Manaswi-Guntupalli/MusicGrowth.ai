@@ -1,0 +1,12 @@
+[
+  {"artist":"The Weeknd","song":"Blinding Lights","cluster":"mainstream-pop","features":{"tempo":0.78,"energy":0.86,"danceability":0.84,"valence":0.73,"acousticness":0.18,"instrumentalness":0.05,"speechiness":0.08,"loudness":0.86,"liveness":0.32}},
+  {"artist":"Dua Lipa","song":"Levitating","cluster":"mainstream-pop","features":{"tempo":0.80,"energy":0.83,"danceability":0.89,"valence":0.79,"acousticness":0.21,"instrumentalness":0.04,"speechiness":0.08,"loudness":0.84,"liveness":0.29}},
+  {"artist":"Clairo","song":"Pretty Girl","cluster":"indie-bedroom","features":{"tempo":0.48,"energy":0.39,"danceability":0.54,"valence":0.44,"acousticness":0.72,"instrumentalness":0.21,"speechiness":0.07,"loudness":0.52,"liveness":0.23}},
+  {"artist":"girl in red","song":"we fell in love in october","cluster":"indie-bedroom","features":{"tempo":0.50,"energy":0.47,"danceability":0.58,"valence":0.51,"acousticness":0.66,"instrumentalness":0.13,"speechiness":0.06,"loudness":0.56,"liveness":0.21}},
+  {"artist":"Bon Iver","song":"Skinny Love","cluster":"chill-acoustic","features":{"tempo":0.40,"energy":0.30,"danceability":0.34,"valence":0.26,"acousticness":0.88,"instrumentalness":0.17,"speechiness":0.04,"loudness":0.40,"liveness":0.20}},
+  {"artist":"Lorde","song":"Liability","cluster":"chill-acoustic","features":{"tempo":0.36,"energy":0.27,"danceability":0.33,"valence":0.28,"acousticness":0.81,"instrumentalness":0.10,"speechiness":0.05,"loudness":0.43,"liveness":0.24}},
+  {"artist":"Avicii","song":"Wake Me Up","cluster":"electronic-dance","features":{"tempo":0.82,"energy":0.89,"danceability":0.83,"valence":0.77,"acousticness":0.20,"instrumentalness":0.05,"speechiness":0.06,"loudness":0.90,"liveness":0.35}},
+  {"artist":"Martin Garrix","song":"Animals","cluster":"electronic-dance","features":{"tempo":0.84,"energy":0.93,"danceability":0.80,"valence":0.70,"acousticness":0.10,"instrumentalness":0.30,"speechiness":0.05,"loudness":0.92,"liveness":0.30}},
+  {"artist":"Billie Eilish","song":"Ocean Eyes","cluster":"experimental-alt","features":{"tempo":0.44,"energy":0.34,"danceability":0.49,"valence":0.38,"acousticness":0.67,"instrumentalness":0.15,"speechiness":0.06,"loudness":0.48,"liveness":0.18}},
+  {"artist":"Beach House","song":"Space Song","cluster":"experimental-alt","features":{"tempo":0.45,"energy":0.36,"danceability":0.40,"valence":0.33,"acousticness":0.59,"instrumentalness":0.19,"speechiness":0.04,"loudness":0.47,"liveness":0.19}}
+]
