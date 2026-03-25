@@ -44,9 +44,16 @@ class StrategicPath(BaseModel):
     actions: list[str]
 
 
+class StyleClusterPrediction(BaseModel):
+    cluster_id: int
+    label: str
+    confidence: float
+
+
 class AnalysisResponse(BaseModel):
     analysis_id: str | None = None
     sound_dna: SoundDNA
+    style_cluster: StyleClusterPrediction
     top_similar: list[SimilarReference]
     differences: list[DifferenceInsight]
     market_gaps: list[str]

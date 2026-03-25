@@ -3,7 +3,7 @@ from __future__ import annotations
 from .feature_extraction import extract_features_from_path
 from .interpretation import mood_label, production_style
 from .normalization import normalize_features
-from .similarity import reference_mean, top_similar
+from .similarity import predict_style_cluster, reference_mean, top_similar
 from .strategy import build_differences, build_market_gaps, build_paths
 
 
@@ -12,6 +12,7 @@ def run_analysis(audio_path: str, segment_mode: str = "best") -> dict:
     normalized = normalize_features(raw)
 
     top_refs = top_similar(normalized, top_k=3)
+    style_cluster = predict_style_cluster(normalized)
     ref_avg = reference_mean(top_refs)
     differences = build_differences(normalized, ref_avg)
 
@@ -34,6 +35,7 @@ def run_analysis(audio_path: str, segment_mode: str = "best") -> dict:
 
     return {
         "sound_dna": sound_dna,
+        "style_cluster": style_cluster,
         "top_similar": [
             {
                 "artist": ref["artist"],

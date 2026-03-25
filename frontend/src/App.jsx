@@ -288,6 +288,19 @@ export default function App() {
       {result && (
         <main className="grid">
           <section className="card">
+            <h3>ML Style Cluster</h3>
+            <p className="sub">
+              Predicted Group: <strong>{result.style_cluster.label}</strong>
+            </p>
+            <p>
+              Cluster ID: <strong>{result.style_cluster.cluster_id}</strong>
+            </p>
+            <p>
+              Confidence: <strong>{Number(result.style_cluster.confidence).toFixed(2)}%</strong>
+            </p>
+          </section>
+
+          <section className="card">
             <h3>Sound DNA</h3>
             <p className="sub">
               Mood: <strong>{result.sound_dna.mood}</strong> | Production Style:{' '}

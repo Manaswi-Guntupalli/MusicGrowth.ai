@@ -7,6 +7,9 @@ from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import StandardScaler
 
 from .normalization import clamp01, minmax
 
@@ -23,11 +26,30 @@ FEATURE_ORDER = [
 ]
 
 
-def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    denom = float(np.linalg.norm(a) * np.linalg.norm(b))
-    if denom == 0.0:
-        return 0.0
-    return float(np.dot(a, b) / denom)
+def _distance_to_similarity(distance: float) -> float:
+    # Cosine distance is 0 (identical) to 2 (opposite). Convert to 0-100 score.
+    similarity = (1.0 - (distance / 2.0)) * 100.0
+    return max(0.0, min(100.0, similarity))
+
+
+def _softmax(x: np.ndarray) -> np.ndarray:
+    shifted = x - np.max(x)
+    exp = np.exp(shifted)
+    return exp / (np.sum(exp) + 1e-9)
+
+
+def _label_from_centroid(features: dict[str, float]) -> str:
+    if features["energy"] > 0.75 and features["danceability"] > 0.7:
+        return "High-Energy Mainstream"
+    if features["acousticness"] > 0.7 and features["energy"] < 0.45:
+        return "Acoustic Chill"
+    if features["instrumentalness"] > 0.55 and features["speechiness"] < 0.25:
+        return "Instrumental Atmospheric"
+    if features["valence"] > 0.65:
+        return "Bright Upbeat"
+    if features["valence"] < 0.35 and features["energy"] < 0.5:
+        return "Moody Introspective"
+    return "Balanced Indie"
 
 
 def _infer_cluster(features: dict[str, float]) -> str:
@@ -125,24 +147,116 @@ def vectorize(features: dict[str, float]) -> np.ndarray:
     return np.array([features[name] for name in FEATURE_ORDER], dtype=np.float32)
 
 
-def top_similar(song_features: dict[str, float], top_k: int = 3) -> list[dict]:
+@lru_cache(maxsize=1)
+def get_similarity_model() -> dict:
     refs = load_reference_dataset()
-    song_vec = vectorize(song_features)
+    if not refs:
+        raise ValueError("Reference dataset is empty; cannot train similarity model.")
 
-    scored = []
-    for ref in refs:
-        ref_vec = vectorize(ref["features"])
-        score = cosine_similarity(song_vec, ref_vec)
-        scored.append({
-            "artist": ref["artist"],
-            "song": ref["song"],
-            "cluster": ref["cluster"],
-            "similarity": round(score * 100, 2),
-            "features": ref["features"],
-        })
+    matrix = np.vstack([vectorize(ref["features"]) for ref in refs])
+    scaler = StandardScaler()
+    matrix_scaled = scaler.fit_transform(matrix)
 
-    scored.sort(key=lambda x: x["similarity"], reverse=True)
-    return scored[:top_k]
+    nn = NearestNeighbors(metric="cosine", algorithm="brute")
+    nn.fit(matrix_scaled)
+
+    cluster_count = int(os.getenv("STYLE_CLUSTER_COUNT", "8"))
+    cluster_count = max(3, min(cluster_count, 16))
+    kmeans = KMeans(n_clusters=cluster_count, random_state=42, n_init=10)
+    kmeans.fit(matrix_scaled)
+
+    # Cluster compactness stats for confidence calibration.
+    labels = kmeans.labels_
+    dist_to_assigned = np.linalg.norm(matrix_scaled - kmeans.cluster_centers_[labels], axis=1)
+    cluster_distance_stats: dict[int, dict[str, float]] = {}
+    for cluster_id in range(cluster_count):
+        cluster_dist = dist_to_assigned[labels == cluster_id]
+        if len(cluster_dist) == 0:
+            cluster_distance_stats[cluster_id] = {"mean": 1.0, "std": 0.25}
+            continue
+        cluster_distance_stats[cluster_id] = {
+            "mean": float(np.mean(cluster_dist)),
+            "std": float(np.std(cluster_dist) + 1e-6),
+        }
+
+    centers_unscaled = scaler.inverse_transform(kmeans.cluster_centers_)
+    cluster_labels: dict[int, str] = {}
+    for i, center in enumerate(centers_unscaled):
+        center_features = {FEATURE_ORDER[idx]: float(center[idx]) for idx in range(len(FEATURE_ORDER))}
+        cluster_labels[i] = _label_from_centroid(center_features)
+
+    return {
+        "refs": refs,
+        "scaler": scaler,
+        "nn": nn,
+        "kmeans": kmeans,
+        "cluster_labels": cluster_labels,
+        "cluster_distance_stats": cluster_distance_stats,
+    }
+
+
+def top_similar(song_features: dict[str, float], top_k: int = 3) -> list[dict]:
+    model = get_similarity_model()
+    refs = model["refs"]
+    scaler: StandardScaler = model["scaler"]
+    nn: NearestNeighbors = model["nn"]
+
+    if not refs:
+        return []
+
+    query = vectorize(song_features).reshape(1, -1)
+    query_scaled = scaler.transform(query)
+    neighbors = min(top_k, len(refs))
+    distances, indices = nn.kneighbors(query_scaled, n_neighbors=neighbors)
+
+    results: list[dict] = []
+    for distance, idx in zip(distances[0], indices[0]):
+        ref = refs[int(idx)]
+        results.append(
+            {
+                "artist": ref["artist"],
+                "song": ref["song"],
+                "cluster": ref["cluster"],
+                "similarity": round(_distance_to_similarity(float(distance)), 2),
+                "features": ref["features"],
+            }
+        )
+
+    return results
+
+
+def predict_style_cluster(song_features: dict[str, float]) -> dict:
+    model = get_similarity_model()
+    scaler: StandardScaler = model["scaler"]
+    kmeans: KMeans = model["kmeans"]
+    cluster_labels: dict[int, str] = model["cluster_labels"]
+    cluster_distance_stats: dict[int, dict[str, float]] = model["cluster_distance_stats"]
+
+    query = vectorize(song_features).reshape(1, -1)
+    query_scaled = scaler.transform(query)
+    cluster_id = int(kmeans.predict(query_scaled)[0])
+
+    distances = np.linalg.norm(kmeans.cluster_centers_ - query_scaled[0], axis=1)
+
+    # Soft assignment gives probability-like membership confidence across clusters.
+    temperature = max(float(np.std(distances)), 0.35)
+    membership = _softmax(-distances / temperature)
+    membership_conf = float(membership[cluster_id])
+
+    # Compactness calibrates confidence against typical in-cluster training distances.
+    nearest = float(distances[cluster_id])
+    stats = cluster_distance_stats.get(cluster_id, {"mean": 1.0, "std": 0.25})
+    z = (nearest - stats["mean"]) / (stats["std"] + 1e-6)
+    compactness_conf = float(1.0 / (1.0 + np.exp(z)))
+
+    confidence = 0.7 * membership_conf + 0.3 * compactness_conf
+    confidence = max(0.0, min(1.0, confidence))
+
+    return {
+        "cluster_id": cluster_id,
+        "label": cluster_labels.get(cluster_id, "Balanced Indie"),
+        "confidence": round(confidence * 100.0, 2),
+    }
 
 
 def reference_mean(top_refs: list[dict]) -> dict[str, float]:
