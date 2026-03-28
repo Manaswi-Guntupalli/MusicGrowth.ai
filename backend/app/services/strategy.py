@@ -1,22 +1,47 @@
 from __future__ import annotations
 
 from .interpretation import difference_interpretation
+from .sound_dna import CORE_FEATURES
 
 
-def build_differences(song: dict[str, float], ref_mean: dict[str, float]) -> list[dict]:
-    important = ["energy", "tempo", "acousticness", "danceability", "valence"]
+def build_differences(
+    song: dict[str, float],
+    ref_mean: dict[str, float],
+    feature_importance: dict[str, float],
+    delta_threshold: float = 0.2,
+) -> list[dict]:
     diffs: list[dict] = []
 
-    for name in important:
-        ref = ref_mean[name] if ref_mean[name] != 0 else 0.0001
-        delta_pct = ((song[name] - ref) / ref) * 100
+    for name in CORE_FEATURES:
+        ref = float(ref_mean.get(name, 0.0))
+        song_val = float(song.get(name, 0.0))
+
+        if name == "tempo":
+            delta_ratio = (song_val - ref) / max(abs(ref), 1.0)
+        elif name == "loudness":
+            delta_ratio = (song_val - ref) / max(abs(ref), 1.0)
+        else:
+            delta_ratio = song_val - ref
+
+        delta_pct = delta_ratio * 100.0
+        importance = float(feature_importance.get(name, 0.0))
+        is_key = abs(delta_ratio) > delta_threshold and importance >= 0.08
+        is_opportunity = abs(delta_ratio) > delta_threshold and not is_key
+
+        if is_key:
+            tag = "KEY DIFFERENTIATOR"
+        elif is_opportunity:
+            tag = "OPPORTUNITY"
+        else:
+            tag = "NORMAL"
+
         diffs.append(
             {
                 "feature": name,
-                "song_value": round(song[name], 3),
-                "reference_mean": round(ref_mean[name], 3),
+                "song_value": round(song_val, 3),
+                "reference_mean": round(ref, 3),
                 "delta_percent": round(delta_pct, 1),
-                "interpretation": difference_interpretation(name, delta_pct),
+                "interpretation": f"[{tag}] {difference_interpretation(name, delta_pct)}",
             }
         )
 
@@ -24,17 +49,31 @@ def build_differences(song: dict[str, float], ref_mean: dict[str, float]) -> lis
     return diffs
 
 
-def build_market_gaps(song: dict[str, float]) -> list[str]:
-    gaps: list[str] = []
-    if song["energy"] < 0.45 and song["valence"] > 0.55:
-        gaps.append("Low-energy but positive-emotion zone appears underrepresented in pop references.")
-    if song["acousticness"] > 0.65 and song["danceability"] > 0.55:
-        gaps.append("Acoustic-dance crossover can open a niche between indie and rhythmic playlists.")
-    if song["instrumentalness"] > 0.55 and song["speechiness"] < 0.2:
-        gaps.append("High-instrumental, low-vocal profile fits focus and ambient growth segments.")
-    if not gaps:
-        gaps.append("No strong blue-ocean signal detected; differentiation likely comes from storytelling and branding.")
-    return gaps
+def build_market_gaps(style_cluster: dict, market_profile: dict[str, dict[str, float]]) -> list[str]:
+    cluster_id = style_cluster.get("cluster_id")
+    cluster_key = str(cluster_id)
+    profile = market_profile.get(cluster_key)
+
+    if profile is None:
+        return ["Moderate opportunity detected in adjacent clusters; refine release strategy with small A/B tests."]
+
+    demand = float(profile.get("demand", 0.0))
+    saturation = float(profile.get("saturation", 1.0))
+    opportunity_score = float(profile.get("opportunity_score", demand / max(1.0, saturation)))
+
+    if opportunity_score >= 2.5:
+        zone = "High"
+    elif opportunity_score >= 1.0:
+        zone = "Moderate"
+    else:
+        zone = "Emerging"
+
+    return [
+        (
+            f"{zone} opportunity in {style_cluster.get('label', 'current')} cluster "
+            f"(demand={demand:.1f}, saturation={saturation:.0f}, score={opportunity_score:.2f})."
+        )
+    ]
 
 
 def build_paths() -> list[dict]:

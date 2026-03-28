@@ -6,6 +6,7 @@ from tempfile import NamedTemporaryFile
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import ValidationError
 
 from ..db.mongodb import get_db
 from ..dependencies.auth import get_current_user
@@ -66,6 +67,14 @@ async def list_analyses(current_user: dict = Depends(get_current_user)) -> list[
     items: list[AnalysisHistoryItem] = []
     async for doc in cursor:
         sound_dna = doc.get("result", {}).get("sound_dna", {})
+        parsed_result: AnalysisResponse | None = None
+        if doc.get("result"):
+            try:
+                parsed_result = AnalysisResponse(**doc["result"])
+            except ValidationError:
+                # Keep legacy/malformed records in history without breaking the whole endpoint.
+                parsed_result = None
+
         items.append(
             AnalysisHistoryItem(
                 id=str(doc["_id"]),
@@ -74,6 +83,7 @@ async def list_analyses(current_user: dict = Depends(get_current_user)) -> list[
                 mood=sound_dna.get("mood", "Unknown"),
                 production_style=sound_dna.get("production_style", "Unknown"),
                 created_at=doc.get("created_at", datetime.now(UTC)),
+                result=parsed_result,
             )
         )
     return items

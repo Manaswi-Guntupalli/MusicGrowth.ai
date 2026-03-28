@@ -9,7 +9,7 @@ def production_style(features: dict[str, float]) -> str:
 
     if energy < 0.45 and acousticness > 0.6:
         return "Lo-fi / intimate"
-    if energy > 0.75 and loudness > 0.75:
+    if energy > 0.75 and loudness > -8.0:
         return "Polished / high-impact"
     if speechiness > 0.6:
         return "Vocal-forward / speech-heavy"

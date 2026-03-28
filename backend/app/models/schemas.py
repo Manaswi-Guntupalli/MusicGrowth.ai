@@ -13,9 +13,11 @@ class SoundDNA(BaseModel):
     speechiness: float
     loudness: float
     liveness: float
-    spectral_centroid: float
-    spectral_bandwidth: float
-    zcr: float
+    mfcc_mean_1: float
+    mfcc_mean_2: float
+    mfcc_mean_3: float
+    mfcc_mean_4: float
+    mfcc_mean_5: float
     production_style: str
     mood: str
 
@@ -90,3 +92,13 @@ class AnalysisHistoryItem(BaseModel):
     mood: str
     production_style: str
     created_at: datetime
+    result: AnalysisResponse | None = None
+
+
+class Analysis(BaseModel):
+    id: str
+    user_id: str
+    filename: str
+    segment_mode: str
+    result: AnalysisResponse
+    created_at: datetime = Field(default_factory=datetime.utcnow)
