@@ -11,6 +11,7 @@ This document explains exactly how to run the full website end to end:
 - Register or Login
 - Dashboard
 - Song upload and analysis
+- Export analysis as PDF
 - Saving analysis to MongoDB
 
 ## 1. Project Layout
@@ -70,11 +71,11 @@ Install backend dependencies:
 
 Run backend API:
 
-- python -m uvicorn app.main:app --app-dir D:/MusicGrowth.ai/backend --host 127.0.0.1 --port 8000 --reload
+- python -m uvicorn app.main:app --app-dir D:/MusicGrowth.ai/backend --host 127.0.0.1 --port 8001 --reload
 
 Health check in another terminal:
 
-- Invoke-RestMethod http://127.0.0.1:8000/api/health
+- Invoke-RestMethod http://127.0.0.1:8001/api/health
 
 Expected:
 
@@ -108,7 +109,8 @@ Open in browser:
 4. Upload a song with the Choose File button
 5. Click Analyze Song
 6. Sound DNA, Similar References, Differences, Market Gaps, and Strategic Paths appear
-7. Saved Analyses section updates automatically
+7. Export as PDF button is available on the Analysis page
+8. Saved Analyses section updates automatically
 
 ## 7. MongoDB Data That Gets Saved
 
@@ -173,18 +175,18 @@ PowerShell example:
 
 Register:
 
-- Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/auth/register -ContentType application/json -Body '{"name":"Test","email":"test1@musicgrowth.ai","password":"demo1234"}'
+- Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8001/api/auth/register -ContentType application/json -Body '{"name":"Test","email":"test1@musicgrowth.ai","password":"demo1234"}'
 
 Analyze with token:
 
 1. Save token from register response as TOKEN
 2. Run:
 
-- curl.exe -X POST "http://127.0.0.1:8000/api/analyze?segment_mode=best" -H "Authorization: Bearer TOKEN" -F "file=@D:/MusicGrowth.ai/dark_horse_remix.mp3"
+- curl.exe -X POST "http://127.0.0.1:8001/api/analyze?segment_mode=best" -H "Authorization: Bearer TOKEN" -F "file=@D:/MusicGrowth.ai/dark_horse_remix.mp3"
 
 Get saved analyses:
 
-- Invoke-RestMethod -Method Get -Uri http://127.0.0.1:8000/api/analyses -Headers @{ Authorization = "Bearer TOKEN" }
+- Invoke-RestMethod -Method Get -Uri http://127.0.0.1:8001/api/analyses -Headers @{ Authorization = "Bearer TOKEN" }
 
 ## 11. Common Issues and Fixes
 
@@ -217,10 +219,17 @@ Fix:
 - Ensure both Spotify CSV files are in D:\MusicGrowth.ai
 - Or set SPOTIFY_DATASET_APRIL and SPOTIFY_DATASET_NOV
 
+Issue: history count seems stuck at 20
+
+Fix:
+
+- History endpoint now returns all analyses for the user (sorted newest first)
+- Refresh History page after backend restart to pick up latest code
+
 ## 12. Exact Startup Order (Recommended Every Time)
 
 1. Start MongoDB
-2. Start backend on port 8000
+2. Start backend on port 8001
 3. Start frontend on port 5173
 4. Open website
 5. Register or Login

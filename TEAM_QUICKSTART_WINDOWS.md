@@ -43,12 +43,12 @@ From project root:
 - cd backend
 - ..\.venv\Scripts\activate
 - python -m pip install -r requirements.txt
-- python -m uvicorn app.main:app --app-dir D:/MusicGrowth.ai/backend --host 127.0.0.1 --port 8000 --reload
+- python -m uvicorn app.main:app --app-dir D:/MusicGrowth.ai/backend --host 127.0.0.1 --port 8001 --reload
 
 Expected health:
 
 - Open new terminal and run:
-- Invoke-RestMethod http://127.0.0.1:8000/api/health
+- Invoke-RestMethod http://127.0.0.1:8001/api/health
 - Expected result: {"status":"ok"}
 
 ## F. Start Frontend (Terminal 2)
