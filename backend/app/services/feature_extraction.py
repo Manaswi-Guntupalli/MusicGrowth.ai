@@ -7,6 +7,9 @@ import librosa
 import numpy as np
 
 
+MIN_VALID_AUDIO_RMS = 1e-4
+
+
 @dataclass
 class RawFeatures:
     tempo: float
@@ -29,9 +32,18 @@ class RawFeatures:
 
 
 def load_audio(path: str, sr: int = 22050) -> tuple[np.ndarray, int]:
-    y, sampled_rate = librosa.load(path, sr=sr, mono=True)
+    try:
+        y, sampled_rate = librosa.load(path, sr=sr, mono=True)
+    except Exception as exc:
+        raise ValueError("Please upload a valid music audio file (not empty or silent).") from exc
+    
     if len(y) == 0:
-        raise ValueError("Audio file appears empty.")
+        raise ValueError("Please upload a valid music audio file (not empty or silent).")
+
+    rms = float(np.sqrt(np.mean(np.square(y))))
+    if not np.isfinite(rms) or rms < MIN_VALID_AUDIO_RMS:
+        raise ValueError("Please upload a valid music audio file (not empty or silent).")
+
     return y, sampled_rate
 
 

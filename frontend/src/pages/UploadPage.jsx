@@ -41,7 +41,12 @@ export default function UploadPage({ token, onAnalysisComplete }) {
       onAnalysisComplete(data)
     } catch (err) {
       console.error('Analyze error:', err)
-      setError(err.message || 'Could not analyze this file.')
+      const message = err?.message || 'Could not analyze this file.'
+      if (/empty|silent|valid music audio|audio file appears empty/i.test(message)) {
+        setError('Please upload a valid music audio file (not empty or silent).')
+      } else {
+        setError(message)
+      }
     } finally {
       setLoading(false)
     }

@@ -50,6 +50,8 @@ async def analyze_song(
         inserted = await db.song_analyses.insert_one(doc)
         result["analysis_id"] = str(inserted.inserted_id)
         return AnalysisResponse(**result)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - safe API guard
         raise HTTPException(status_code=500, detail=f"Analysis failed: {exc}") from exc
     finally:
