@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from .similarity import get_market_profile, predict_style_cluster, top_similar
+from .similarity import cluster_membership_probabilities, get_market_profile, predict_style_cluster, top_similar
 from .sound_dna import FEATURE_ORDER, clamp01
 
 UNIT_INTERVAL_FEATURES: Final[set[str]] = {
@@ -53,11 +53,20 @@ def _mean_similarity(rows: list[dict]) -> float:
     return sum(float(item.get("similarity", 0.0)) for item in rows) / float(len(rows))
 
 
-def _market_stats(cluster_id: int) -> dict[str, float]:
-    profile = get_market_profile().get(str(cluster_id), {})
-    demand = float(profile.get("demand", 0.0))
-    saturation = float(profile.get("saturation", 0.0))
-    opportunity = float(profile.get("opportunity_score", demand / max(1.0, saturation)))
+def _expected_market_stats(features: dict[str, float]) -> dict[str, float]:
+    profile = get_market_profile()
+    memberships = cluster_membership_probabilities(features)
+
+    demand = 0.0
+    saturation = 0.0
+    opportunity = 0.0
+
+    for cluster_id, weight in memberships.items():
+        row = profile.get(str(cluster_id), {})
+        demand += float(weight) * float(row.get("demand", 0.0))
+        saturation += float(weight) * float(row.get("saturation", 0.0))
+        opportunity += float(weight) * float(row.get("opportunity_score", 0.0))
+
     return {
         "demand": demand,
         "saturation": saturation,
@@ -68,7 +77,7 @@ def _market_stats(cluster_id: int) -> dict[str, float]:
 def _snapshot(features: dict[str, float]) -> dict:
     cluster = predict_style_cluster(features)
     top_refs = top_similar(features, cluster_id=cluster["cluster_id"], top_k=3)
-    market = _market_stats(int(cluster["cluster_id"]))
+    market = _expected_market_stats(features)
 
     return {
         "style_cluster": cluster,

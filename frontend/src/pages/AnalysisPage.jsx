@@ -153,6 +153,10 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
     return `${value >= 0 ? '+' : ''}${rounded}${suffix}`
   }
 
+  function formatOpportunity(value) {
+    return Number(value || 0).toFixed(5)
+  }
+
   function updateAdjustment(feature, rawValue) {
     const parsed = Number(rawValue)
     setAdjustments((prev) => ({ ...prev, [feature]: Number.isFinite(parsed) ? parsed : 0 }))
@@ -549,11 +553,11 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                 <h4>Auto-optimize Summary</h4>
                 <ul>
                   <li>Objective: {optResult.objective === 'opportunity' ? 'Max Opportunity' : 'Max Similarity'}</li>
-                  <li>Baseline Score: {Number(optResult.baseline_score || 0).toFixed(3)}</li>
-                  <li>Optimized Score: {Number(optResult.optimized_score || 0).toFixed(3)}</li>
+                  <li>Baseline Score: {optResult.objective === 'opportunity' ? formatOpportunity(optResult.baseline_score) : Number(optResult.baseline_score || 0).toFixed(3)}</li>
+                  <li>Optimized Score: {optResult.objective === 'opportunity' ? formatOpportunity(optResult.optimized_score) : Number(optResult.optimized_score || 0).toFixed(3)}</li>
                   <li>
                     Improvement: {Number(optResult.improvement || 0) >= 0 ? '+' : ''}
-                    {Number(optResult.improvement || 0).toFixed(3)}
+                    {optResult.objective === 'opportunity' ? formatOpportunity(optResult.improvement) : Number(optResult.improvement || 0).toFixed(3)}
                   </li>
                 </ul>
               </div>
@@ -576,9 +580,9 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                   </div>
                   <div className="sim-kpi-card">
                     <h4>Opportunity Score</h4>
-                    <p>{simResult.before.opportunity_score.toFixed(3)}</p>
+                    <p>{formatOpportunity(simResult.before.opportunity_score)}</p>
                     <span className={simResult.opportunity_delta >= 0 ? 'sim-positive' : 'sim-negative'}>
-                      {simResult.opportunity_delta >= 0 ? '+' : ''}{simResult.opportunity_delta.toFixed(3)}
+                      {simResult.opportunity_delta >= 0 ? '+' : ''}{formatOpportunity(simResult.opportunity_delta)}
                     </span>
                   </div>
                 </div>

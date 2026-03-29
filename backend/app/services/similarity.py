@@ -358,6 +358,21 @@ def predict_style_cluster(song_features: dict[str, float]) -> dict:
     }
 
 
+def cluster_membership_probabilities(song_features: dict[str, float]) -> dict[int, float]:
+    model = get_similarity_model()
+    scaler: StandardScaler = model["scaler"]
+    kmeans: KMeans = model["kmeans"]
+
+    query = vectorize(song_features).reshape(1, -1)
+    query_scaled = scaler.transform(query)
+
+    distances = np.linalg.norm(kmeans.cluster_centers_ - query_scaled[0], axis=1)
+    temperature = max(float(np.std(distances)), 0.35)
+    membership = _softmax(-distances / temperature)
+
+    return {int(i): float(membership[i]) for i in range(len(membership))}
+
+
 def reference_mean(top_refs: list[dict]) -> dict[str, float]:
     agg: dict[str, float] = {name: 0.0 for name in FEATURE_ORDER}
     if not top_refs:
