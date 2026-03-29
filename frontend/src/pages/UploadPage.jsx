@@ -63,7 +63,17 @@ export default function UploadPage({ token, onAnalysisComplete }) {
         <form onSubmit={handleAnalyze} className="upload-form">
           <div className="file-upload-zone">
             <label className="file-input-label">
-              <div className="file-input-visual">
+              <div className={`file-input-visual ${loading ? 'analyzing' : ''}`}>
+                {loading && (
+                  <div className="upload-note-cloud" aria-hidden="true">
+                    <span className="upload-note n1">♪</span>
+                    <span className="upload-note n2">♫</span>
+                    <span className="upload-note n3">♪</span>
+                    <span className="upload-note n4">♫</span>
+                    <span className="upload-note n5">♪</span>
+                    <span className="upload-note n6">♫</span>
+                  </div>
+                )}
                 <span className="upload-icon">🎵</span>
                 <span className="upload-text">
                   {file ? file.name : 'Drag & drop or click to select'}

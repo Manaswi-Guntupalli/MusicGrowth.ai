@@ -74,6 +74,23 @@ body {
   to { transform: rotate(360deg); }
 }
 
+@keyframes noteFloat {
+  0% {
+    transform: translateY(14px) scale(0.9) rotate(-8deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  80% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(-42px) scale(1.08) rotate(8deg);
+    opacity: 0;
+  }
+}
+
 .fade-in {
   animation: fadeIn 0.6s ease-out forwards;
 }
@@ -565,14 +582,84 @@ body[data-theme='light'] .feature-card:hover {
   padding: 3rem;
   border: 2px dashed var(--primary);
   border-radius: 16px;
-  background: rgba(111, 92, 255, 0.05);
+  background: linear-gradient(135deg, rgba(26, 39, 68, 0.62) 0%, rgba(18, 30, 58, 0.62) 100%);
+  position: relative;
+  overflow: hidden;
   transition: all 0.3s ease;
 }
 
+.file-input-visual::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('./assets/music-pattern.svg');
+  background-size: 320px 180px;
+  background-repeat: repeat;
+  background-position: center;
+  opacity: 0.34;
+  pointer-events: none;
+}
+
+.file-input-visual::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(11, 18, 36, 0.36) 0%, rgba(15, 25, 50, 0.4) 100%);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.file-input-visual > * {
+  position: relative;
+  z-index: 1;
+}
+
+.upload-note-cloud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.upload-note {
+  position: absolute;
+  color: #9a8dff;
+  text-shadow: 0 8px 16px rgba(86, 185, 255, 0.28);
+  font-size: 1.9rem;
+  font-weight: 700;
+  opacity: 0;
+  animation: noteFloat 1.9s ease-in-out infinite;
+}
+
+.upload-note.n1 { left: 10%; bottom: 14%; animation-delay: 0s; }
+.upload-note.n2 { left: 24%; bottom: 20%; animation-delay: 0.2s; color: #56b9ff; }
+.upload-note.n3 { left: 41%; bottom: 13%; animation-delay: 0.45s; }
+.upload-note.n4 { left: 58%; bottom: 22%; animation-delay: 0.7s; color: #56b9ff; }
+.upload-note.n5 { left: 74%; bottom: 15%; animation-delay: 0.95s; }
+.upload-note.n6 { left: 88%; bottom: 18%; animation-delay: 1.2s; color: #56b9ff; }
+
+.file-input-visual.analyzing {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 1px rgba(86, 185, 255, 0.28), 0 18px 34px rgba(15, 25, 50, 0.32);
+}
+
+.file-input-visual.analyzing .upload-icon {
+  animation: pulse 0.9s ease-in-out infinite;
+}
+
 .file-input-label:hover .file-input-visual {
-  background: rgba(111, 92, 255, 0.1);
+  background: linear-gradient(135deg, rgba(35, 55, 96, 0.66) 0%, rgba(24, 42, 82, 0.66) 100%);
   border-color: var(--accent-blue);
   transform: translateY(-2px);
+}
+
+body[data-theme='light'] .file-input-visual::before {
+  opacity: 0.16;
+}
+
+body[data-theme='light'] .file-input-visual::after {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.38) 0%, rgba(245, 249, 255, 0.42) 100%);
+  mix-blend-mode: normal;
 }
 
 .upload-icon {
