@@ -62,6 +62,52 @@ class AnalysisResponse(BaseModel):
     paths: list[StrategicPath]
 
 
+class TrajectorySimulationRequest(BaseModel):
+    base_features: dict[str, float]
+    adjustments: dict[str, float] = Field(default_factory=dict)
+
+
+class TrajectoryFeatureChange(BaseModel):
+    feature: str
+    before: float
+    after: float
+    delta: float
+
+
+class TrajectorySnapshot(BaseModel):
+    style_cluster: StyleClusterPrediction
+    avg_similarity: float
+    market_demand: float
+    market_saturation: float
+    opportunity_score: float
+    top_similar: list[SimilarReference]
+
+
+class TrajectorySimulationResponse(BaseModel):
+    before: TrajectorySnapshot
+    after: TrajectorySnapshot
+    cluster_changed: bool
+    similarity_delta: float
+    opportunity_delta: float
+    adjustments_applied: list[TrajectoryFeatureChange]
+    insights: list[str]
+
+
+class TrajectoryOptimizationRequest(BaseModel):
+    base_features: dict[str, float]
+    objective: str = Field(default="similarity")
+    adjustable_features: list[str] = Field(default_factory=list)
+
+
+class TrajectoryOptimizationResponse(BaseModel):
+    objective: str
+    baseline_score: float
+    optimized_score: float
+    improvement: float
+    recommended_adjustments: list[TrajectoryFeatureChange]
+    simulation: TrajectorySimulationResponse
+
+
 class UserRegisterRequest(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     email: EmailStr

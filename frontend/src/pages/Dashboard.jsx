@@ -115,7 +115,7 @@ export default function Dashboard({ user, token, onLogout, theme, onToggleTheme 
             <UploadPage token={token} onAnalysisComplete={handleAnalysisComplete} />
           )}
           {currentPage === 'analysis' && latestResult && (
-            <AnalysisPage result={latestResult} theme={theme} />
+            <AnalysisPage result={latestResult} theme={theme} token={token} />
           )}
           {currentPage === 'history' && (
             <HistoryPage
@@ -126,7 +126,7 @@ export default function Dashboard({ user, token, onLogout, theme, onToggleTheme 
             />
           )}
           {currentPage === 'history-detail' && selectedHistoryAnalysis && (
-            <HistoryDetailPage analysis={selectedHistoryAnalysis} onBack={handleBackToHistory} theme={theme} />
+            <HistoryDetailPage analysis={selectedHistoryAnalysis} onBack={handleBackToHistory} theme={theme} token={token} />
           )}
         </main>
       </div>

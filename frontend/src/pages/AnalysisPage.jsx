@@ -4,6 +4,37 @@ import { Radar, Bar } from 'react-chartjs-2'
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas'
 
+const API_BASE = '/api'
+
+const FEATURE_ORDER = [
+  'tempo',
+  'energy',
+  'danceability',
+  'valence',
+  'acousticness',
+  'instrumentalness',
+  'liveness',
+  'speechiness',
+  'loudness',
+  'mfcc_mean_1',
+  'mfcc_mean_2',
+  'mfcc_mean_3',
+  'mfcc_mean_4',
+  'mfcc_mean_5',
+]
+
+const SIMULATOR_CONTROLS = [
+  { feature: 'tempo', label: 'Tempo', min: -20, max: 20, step: 1, unit: 'bpm' },
+  { feature: 'energy', label: 'Energy', min: -0.2, max: 0.2, step: 0.01, unit: '' },
+  { feature: 'danceability', label: 'Danceability', min: -0.2, max: 0.2, step: 0.01, unit: '' },
+  { feature: 'valence', label: 'Valence', min: -0.2, max: 0.2, step: 0.01, unit: '' },
+  { feature: 'acousticness', label: 'Acousticness', min: -0.2, max: 0.2, step: 0.01, unit: '' },
+  { feature: 'instrumentalness', label: 'Instrumentalness', min: -0.2, max: 0.2, step: 0.01, unit: '' },
+  { feature: 'liveness', label: 'Liveness', min: -0.2, max: 0.2, step: 0.01, unit: '' },
+  { feature: 'speechiness', label: 'Speechiness', min: -0.2, max: 0.2, step: 0.01, unit: '' },
+  { feature: 'loudness', label: 'Loudness', min: -6, max: 6, step: 0.5, unit: 'dB' },
+]
+
 ChartJS.register(
   RadarController,
   BarController,
@@ -18,9 +49,22 @@ ChartJS.register(
   Legend
 )
 
-export default function AnalysisPage({ result, theme = 'dark' }) {
+export default function AnalysisPage({ result, theme = 'dark', token }) {
   const [activeTab, setActiveTab] = useState('dna')
   const [exporting, setExporting] = useState(false)
+  const [simLoading, setSimLoading] = useState(false)
+  const [optLoading, setOptLoading] = useState(false)
+  const [optObjective, setOptObjective] = useState('similarity')
+  const [simError, setSimError] = useState('')
+  const [simResult, setSimResult] = useState(null)
+  const [optResult, setOptResult] = useState(null)
+  const [adjustments, setAdjustments] = useState(() => {
+    const initial = {}
+    for (const control of SIMULATOR_CONTROLS) {
+      initial[control.feature] = 0
+    }
+    return initial
+  })
 
   const chartTextColor = theme === 'light' ? '#3b4260' : '#e0e7ff'
   const chartTickColor = theme === 'light' ? '#63708f' : '#94a3b8'
@@ -37,6 +81,11 @@ export default function AnalysisPage({ result, theme = 'dark' }) {
       </div>
     )
   }
+
+  const baseFeatures = FEATURE_ORDER.reduce((acc, name) => {
+    acc[name] = Number(result.sound_dna?.[name] ?? 0)
+    return acc
+  }, {})
 
   async function exportToPDF() {
     if (exporting) return
@@ -94,6 +143,120 @@ export default function AnalysisPage({ result, theme = 'dark' }) {
       alert('Failed to export PDF. Please try again.')
     } finally {
       setExporting(false)
+    }
+  }
+
+  function formatDelta(feature, value) {
+    const control = SIMULATOR_CONTROLS.find((item) => item.feature === feature)
+    const suffix = control?.unit ? ` ${control.unit}` : ''
+    const rounded = Math.abs(value) < 1 ? value.toFixed(2) : value.toFixed(1)
+    return `${value >= 0 ? '+' : ''}${rounded}${suffix}`
+  }
+
+  function updateAdjustment(feature, rawValue) {
+    const parsed = Number(rawValue)
+    setAdjustments((prev) => ({ ...prev, [feature]: Number.isFinite(parsed) ? parsed : 0 }))
+  }
+
+  function resetSimulator() {
+    const cleared = {}
+    for (const control of SIMULATOR_CONTROLS) {
+      cleared[control.feature] = 0
+    }
+    setAdjustments(cleared)
+    setSimResult(null)
+    setOptResult(null)
+    setSimError('')
+  }
+
+  async function runAutoOptimize() {
+    if (!token) {
+      setSimError('Missing auth token. Please re-login to run auto-optimize.')
+      return
+    }
+
+    setOptLoading(true)
+    setSimError('')
+
+    try {
+      const res = await fetch(`${API_BASE}/optimize-trajectory`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          base_features: baseFeatures,
+          objective: optObjective,
+          adjustable_features: SIMULATOR_CONTROLS.map((item) => item.feature),
+        }),
+      })
+
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(body.detail || 'Auto-optimize failed.')
+      }
+
+      const optimizedAdjustments = { ...adjustments }
+      for (const control of SIMULATOR_CONTROLS) {
+        optimizedAdjustments[control.feature] = 0
+      }
+
+      for (const row of body.recommended_adjustments || []) {
+        if (row?.feature in optimizedAdjustments) {
+          optimizedAdjustments[row.feature] = Number(row.delta || 0)
+        }
+      }
+
+      setAdjustments(optimizedAdjustments)
+      setOptResult(body)
+      setSimResult(body.simulation)
+    } catch (err) {
+      setSimError(err?.message || 'Could not run auto-optimize.')
+    } finally {
+      setOptLoading(false)
+    }
+  }
+
+  async function runSimulator() {
+    if (!token) {
+      setSimError('Missing auth token. Please re-login to run the simulator.')
+      return
+    }
+
+    setSimLoading(true)
+    setSimError('')
+
+    const filteredAdjustments = {}
+    for (const [feature, delta] of Object.entries(adjustments)) {
+      if (Math.abs(Number(delta)) >= 1e-6) {
+        filteredAdjustments[feature] = Number(delta)
+      }
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/simulate-trajectory`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          base_features: baseFeatures,
+          adjustments: filteredAdjustments,
+        }),
+      })
+
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(body.detail || 'A/B simulation failed.')
+      }
+
+      setSimResult(body)
+    } catch (err) {
+      setSimError(err?.message || 'Could not run trajectory simulation.')
+    } finally {
+      setSimLoading(false)
     }
   }
 
@@ -201,6 +364,9 @@ export default function AnalysisPage({ result, theme = 'dark' }) {
           </button>
           <button className={`tab ${activeTab === 'market' ? 'active' : ''}`} onClick={() => setActiveTab('market')}>
             📈 Market Gap
+          </button>
+          <button className={`tab ${activeTab === 'simulator' ? 'active' : ''}`} onClick={() => setActiveTab('simulator')}>
+            🧪 A/B Simulator
           </button>
         </div>
       </div>
@@ -320,6 +486,133 @@ export default function AnalysisPage({ result, theme = 'dark' }) {
                 <p className="no-gaps">No market gaps detected for your current profile.</p>
               )}
             </div>
+          </section>
+        )}
+
+        {activeTab === 'simulator' && (
+          <section className="tab-pane slide-up">
+            <h3>A/B Trajectory Simulator</h3>
+            <p className="mood-style">Adjust selected features in small increments and simulate how your cluster fit, similarity, and market opportunity may shift before re-producing.</p>
+
+            <div className="simulator-grid">
+              {SIMULATOR_CONTROLS.map((control) => (
+                <div className="sim-control" key={control.feature}>
+                  <div className="sim-control-header">
+                    <span>{control.label}</span>
+                    <span className="sim-delta">{formatDelta(control.feature, adjustments[control.feature] || 0)}</span>
+                  </div>
+                  <div className="sim-control-base">
+                    Baseline: {Number(baseFeatures[control.feature] ?? 0).toFixed(control.feature === 'tempo' ? 1 : 3)}
+                  </div>
+                  <input
+                    type="range"
+                    min={control.min}
+                    max={control.max}
+                    step={control.step}
+                    value={adjustments[control.feature]}
+                    onChange={(e) => updateAdjustment(control.feature, e.target.value)}
+                    className="sim-slider"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="simulator-actions">
+              <div className="optimizer-panel">
+                <label htmlFor="optimizer-objective" className="optimizer-label">Auto-optimize objective</label>
+                <select
+                  id="optimizer-objective"
+                  className="optimizer-select"
+                  value={optObjective}
+                  onChange={(e) => setOptObjective(e.target.value)}
+                  disabled={optLoading || simLoading}
+                >
+                  <option value="similarity">Max Similarity</option>
+                  <option value="opportunity">Max Opportunity</option>
+                </select>
+                <button className="history-view-btn" onClick={runAutoOptimize} disabled={optLoading || simLoading}>
+                  {optLoading ? 'Optimizing...' : 'Auto-optimize Deltas'}
+                </button>
+              </div>
+              <button className="history-view-btn" onClick={runSimulator} disabled={simLoading}>
+                {simLoading ? 'Running Simulation...' : 'Run A/B Simulation'}
+              </button>
+              <button className="sim-reset-btn" onClick={resetSimulator} disabled={simLoading || optLoading}>
+                Reset Adjustments
+              </button>
+            </div>
+
+            {simError && <div className="error-message">{simError}</div>}
+
+            {optResult && (
+              <div className="sim-insights" style={{ marginBottom: '1rem' }}>
+                <h4>Auto-optimize Summary</h4>
+                <ul>
+                  <li>Objective: {optResult.objective === 'opportunity' ? 'Max Opportunity' : 'Max Similarity'}</li>
+                  <li>Baseline Score: {Number(optResult.baseline_score || 0).toFixed(3)}</li>
+                  <li>Optimized Score: {Number(optResult.optimized_score || 0).toFixed(3)}</li>
+                  <li>
+                    Improvement: {Number(optResult.improvement || 0) >= 0 ? '+' : ''}
+                    {Number(optResult.improvement || 0).toFixed(3)}
+                  </li>
+                </ul>
+              </div>
+            )}
+
+            {simResult && (
+              <div className="sim-results">
+                <div className="sim-kpi-grid">
+                  <div className="sim-kpi-card">
+                    <h4>Cluster</h4>
+                    <p>{simResult.before.style_cluster.label}</p>
+                    <span>→ {simResult.after.style_cluster.label}</span>
+                  </div>
+                  <div className="sim-kpi-card">
+                    <h4>Avg Similarity</h4>
+                    <p>{simResult.before.avg_similarity.toFixed(2)}%</p>
+                    <span className={simResult.similarity_delta >= 0 ? 'sim-positive' : 'sim-negative'}>
+                      {simResult.similarity_delta >= 0 ? '+' : ''}{simResult.similarity_delta.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="sim-kpi-card">
+                    <h4>Opportunity Score</h4>
+                    <p>{simResult.before.opportunity_score.toFixed(3)}</p>
+                    <span className={simResult.opportunity_delta >= 0 ? 'sim-positive' : 'sim-negative'}>
+                      {simResult.opportunity_delta >= 0 ? '+' : ''}{simResult.opportunity_delta.toFixed(3)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="sim-insights">
+                  <h4>Simulation Insights</h4>
+                  <ul>
+                    {(simResult.insights || []).map((line, idx) => (
+                      <li key={idx}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="sim-after-list">
+                  <h4>Projected Top Similar Tracks (B)</h4>
+                  {(simResult.after.top_similar || []).map((item, idx) => (
+                    <div key={`${item.artist}-${item.song}-${idx}`} className="similar-item">
+                      <div className="similar-rank">{idx + 1}</div>
+                      <div className="similar-info">
+                        <h4>{item.artist || 'Unknown'}</h4>
+                        <p>{item.song || 'Unknown'}</p>
+                        <span className="cluster-tag">{item.cluster || 'N/A'}</span>
+                      </div>
+                      <div className="similarity-score">
+                        <div className="score-bar">
+                          <div className="score-fill" style={{ width: `${item.similarity || 0}%` }}></div>
+                        </div>
+                        <span>{(item.similarity || 0).toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
       </div>

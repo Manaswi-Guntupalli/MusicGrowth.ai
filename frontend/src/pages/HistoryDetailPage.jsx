@@ -1,6 +1,6 @@
 import AnalysisPage from './AnalysisPage'
 
-export default function HistoryDetailPage({ analysis, onBack, theme }) {
+export default function HistoryDetailPage({ analysis, onBack, theme, token }) {
   const createdAt = analysis?.created_at ? new Date(analysis.created_at) : null
 
   return (
@@ -20,7 +20,7 @@ export default function HistoryDetailPage({ analysis, onBack, theme }) {
         </div>
       </section>
 
-      <AnalysisPage result={analysis?.result} theme={theme} />
+      <AnalysisPage result={analysis?.result} theme={theme} token={token} />
     </div>
   )
 }

@@ -10,8 +10,16 @@ from pydantic import ValidationError
 
 from ..db.mongodb import get_db
 from ..dependencies.auth import get_current_user
-from ..models.schemas import AnalysisHistoryItem, AnalysisResponse
+from ..models.schemas import (
+    AnalysisHistoryItem,
+    AnalysisResponse,
+    TrajectoryOptimizationRequest,
+    TrajectoryOptimizationResponse,
+    TrajectorySimulationRequest,
+    TrajectorySimulationResponse,
+)
 from ..services.pipeline import run_analysis
+from ..services.trajectory import run_auto_optimize, run_trajectory_simulation
 
 router = APIRouter(tags=["analysis"])
 
@@ -89,3 +97,39 @@ async def list_analyses(current_user: dict = Depends(get_current_user)) -> list[
             )
         )
     return items
+
+
+@router.post("/simulate-trajectory", response_model=TrajectorySimulationResponse)
+async def simulate_trajectory(
+    payload: TrajectorySimulationRequest,
+    current_user: dict = Depends(get_current_user),
+) -> TrajectorySimulationResponse:
+    _ = current_user  # Keep endpoint auth-protected for user-level usage telemetry.
+
+    try:
+        simulated = run_trajectory_simulation(payload.base_features, payload.adjustments)
+        return TrajectorySimulationResponse(**simulated)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - safe API guard
+        raise HTTPException(status_code=500, detail=f"Trajectory simulation failed: {exc}") from exc
+
+
+@router.post("/optimize-trajectory", response_model=TrajectoryOptimizationResponse)
+async def optimize_trajectory(
+    payload: TrajectoryOptimizationRequest,
+    current_user: dict = Depends(get_current_user),
+) -> TrajectoryOptimizationResponse:
+    _ = current_user
+
+    try:
+        optimized = run_auto_optimize(
+            base_features=payload.base_features,
+            objective=payload.objective,
+            adjustable_features=payload.adjustable_features,
+        )
+        return TrajectoryOptimizationResponse(**optimized)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - safe API guard
+        raise HTTPException(status_code=500, detail=f"Trajectory optimization failed: {exc}") from exc
