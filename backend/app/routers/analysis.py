@@ -64,7 +64,7 @@ async def analyze_song(
 @router.get("/analyses", response_model=list[AnalysisHistoryItem])
 async def list_analyses(current_user: dict = Depends(get_current_user)) -> list[AnalysisHistoryItem]:
     db = get_db()
-    cursor = db.song_analyses.find({"user_id": ObjectId(current_user["id"])}).sort("created_at", -1).limit(20)
+    cursor = db.song_analyses.find({"user_id": ObjectId(current_user["id"])}).sort("created_at", -1)
 
     items: list[AnalysisHistoryItem] = []
     async for doc in cursor:

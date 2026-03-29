@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Chart as ChartJS, RadarController, BarController, CategoryScale, LinearScale, RadialLinearScale, PointElement, LineElement, BarElement, Filler, Tooltip, Legend } from 'chart.js'
 import { Radar, Bar } from 'react-chartjs-2'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas'
 
 ChartJS.register(
   RadarController,
@@ -18,6 +20,7 @@ ChartJS.register(
 
 export default function AnalysisPage({ result, theme = 'dark' }) {
   const [activeTab, setActiveTab] = useState('dna')
+  const [exporting, setExporting] = useState(false)
 
   const chartTextColor = theme === 'light' ? '#3b4260' : '#e0e7ff'
   const chartTickColor = theme === 'light' ? '#63708f' : '#94a3b8'
@@ -33,6 +36,65 @@ export default function AnalysisPage({ result, theme = 'dark' }) {
         </div>
       </div>
     )
+  }
+
+  async function exportToPDF() {
+    if (exporting) return
+    setExporting(true)
+
+    try {
+      const element = document.querySelector('.page-content')
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: theme === 'light' ? '#ffffff' : '#0f172a',
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const imgWidth = 210 - 20
+      const pageHeight = 297
+      let heightLeft = canvas.height * (imgWidth / canvas.width)
+      let position = 0
+
+      // Add title page
+      pdf.setFillColor(111, 92, 255)
+      pdf.rect(0, 0, 210, 60, 'F')
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(28)
+      pdf.text('MusicGrowth Analysis', 105, 30, { align: 'center' })
+      
+      pdf.setTextColor(100, 100, 100)
+      pdf.setFontSize(12)
+      pdf.text(`${result.style_cluster.label} - ${result.sound_dna.mood}`, 105, 50, { align: 'center' })
+
+      // Add metadata
+      pdf.setTextColor(80, 80, 80)
+      pdf.setFontSize(10)
+      const date = new Date().toLocaleDateString()
+      pdf.text(`Generated: ${date}`, 10, 75)
+      pdf.text(`Confidence: ${result.style_cluster.confidence.toFixed(1)}%`, 10, 85)
+
+      // Add analysis content
+      pdf.addPage()
+      pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, (imgWidth / canvas.width) * canvas.height)
+      heightLeft -= pageHeight
+
+      while (heightLeft >= 0) {
+        position = heightLeft - canvas.height
+        pdf.addPage()
+        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, (imgWidth / canvas.width) * canvas.height)
+        heightLeft -= pageHeight
+      }
+
+      pdf.save(`MusicGrowth-Analysis-${result.style_cluster.label}.pdf`)
+    } catch (err) {
+      console.error('PDF export error:', err)
+      alert('Failed to export PDF. Please try again.')
+    } finally {
+      setExporting(false)
+    }
   }
 
   const soundDnaData = {
@@ -100,6 +162,19 @@ export default function AnalysisPage({ result, theme = 'dark' }) {
 
   return (
     <div className="page-content fade-in">
+      {/* Export Button */}
+      <div className="analysis-controls">
+        <button 
+          className={`export-btn ${exporting ? 'loading' : ''}`}
+          onClick={exportToPDF}
+          disabled={exporting}
+          title="Export analysis as PDF"
+        >
+          <span className="export-icon">📥</span>
+          {exporting ? 'Generating PDF...' : 'Export as PDF'}
+        </button>
+      </div>
+
       <section className="analysis-header">
         <div className="cluster-badge">
           <h2>{result.style_cluster.label}</h2>
