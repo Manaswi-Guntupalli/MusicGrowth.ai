@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Chart as ChartJS, RadarController, BarController, CategoryScale, LinearScale, RadialLinearScale, PointElement, LineElement, BarElement, Filler, Tooltip, Legend } from 'chart.js'
 import { Radar, Bar } from 'react-chartjs-2'
 import { jsPDF } from 'jspdf'
-import html2canvas from 'html2canvas'
 
 const API_BASE = '/api'
 
@@ -92,52 +91,236 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
     setExporting(true)
 
     try {
-      const element = document.querySelector('.page-content')
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: theme === 'light' ? '#ffffff' : '#0f172a',
-      })
-
-      const imgData = canvas.toDataURL('image/png')
       const pdf = new jsPDF('p', 'mm', 'a4')
-      const imgWidth = 210 - 20
-      const pageHeight = 297
-      let heightLeft = canvas.height * (imgWidth / canvas.width)
-      let position = 0
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 12
+      const contentWidth = pageWidth - margin * 2
+      let y = margin
 
-      // Add title page
-      pdf.setFillColor(111, 92, 255)
-      pdf.rect(0, 0, 210, 60, 'F')
-      pdf.setTextColor(255, 255, 255)
-      pdf.setFontSize(28)
-      pdf.text('MusicGrowth Analysis', 105, 30, { align: 'center' })
-      
-      pdf.setTextColor(100, 100, 100)
-      pdf.setFontSize(12)
-      pdf.text(`${result.style_cluster.label} - ${result.sound_dna.mood}`, 105, 50, { align: 'center' })
-
-      // Add metadata
-      pdf.setTextColor(80, 80, 80)
-      pdf.setFontSize(10)
-      const date = new Date().toLocaleDateString()
-      pdf.text(`Generated: ${date}`, 10, 75)
-      pdf.text(`Confidence: ${result.style_cluster.confidence.toFixed(1)}%`, 10, 85)
-
-      // Add analysis content
-      pdf.addPage()
-      pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, (imgWidth / canvas.width) * canvas.height)
-      heightLeft -= pageHeight
-
-      while (heightLeft >= 0) {
-        position = heightLeft - canvas.height
-        pdf.addPage()
-        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, (imgWidth / canvas.width) * canvas.height)
-        heightLeft -= pageHeight
+      const ensureSpace = (needed = 8) => {
+        if (y + needed > pageHeight - margin) {
+          pdf.addPage()
+          y = margin
+        }
       }
 
-      pdf.save(`MusicGrowth-Analysis-${result.style_cluster.label}.pdf`)
+      const writeWrapped = (text, fontSize = 10, color = [56, 65, 90], lineHeight = 5) => {
+        const content = String(text || '').trim()
+        if (!content) return
+        pdf.setFontSize(fontSize)
+        pdf.setTextColor(color[0], color[1], color[2])
+        const lines = pdf.splitTextToSize(content, contentWidth)
+        for (const line of lines) {
+          ensureSpace(lineHeight)
+          pdf.text(line, margin, y)
+          y += lineHeight
+        }
+      }
+
+      const writeSectionTitle = (title) => {
+        ensureSpace(10)
+        y += 1
+        pdf.setFontSize(13)
+        pdf.setTextColor(46, 53, 87)
+        pdf.text(title, margin, y)
+        y += 2.5
+        pdf.setDrawColor(200, 210, 235)
+        pdf.line(margin, y, pageWidth - margin, y)
+        y += 5
+      }
+
+      const writeBullets = (items) => {
+        for (const item of items) {
+          const lines = pdf.splitTextToSize(String(item || ''), contentWidth - 4)
+          if (lines.length === 0) continue
+          ensureSpace(5)
+          pdf.setFontSize(10)
+          pdf.setTextColor(56, 65, 90)
+          pdf.text('\u2022', margin, y)
+          pdf.text(lines[0], margin + 4, y)
+          y += 5
+          for (const line of lines.slice(1)) {
+            ensureSpace(5)
+            pdf.text(line, margin + 4, y)
+            y += 5
+          }
+        }
+      }
+
+      const writeKV = (label, value) => {
+        ensureSpace(5)
+        pdf.setFontSize(10)
+        pdf.setTextColor(40, 48, 75)
+        pdf.text(`${label}:`, margin, y)
+        const lines = pdf.splitTextToSize(String(value || 'N/A'), contentWidth - 34)
+        if (lines.length > 0) {
+          pdf.setTextColor(70, 80, 110)
+          pdf.text(lines[0], margin + 34, y)
+          y += 5
+          for (const line of lines.slice(1)) {
+            ensureSpace(5)
+            pdf.text(line, margin + 34, y)
+            y += 5
+          }
+        } else {
+          y += 5
+        }
+      }
+
+      const writeExplainability = (title, block) => {
+        if (!block) return
+        writeSectionTitle(title)
+        writeKV('Source', block.source === 'openai' ? 'OpenAI explanation layer' : 'ML local explanation')
+        writeKV('Confidence', Number(block.confidence || 0).toFixed(3))
+        writeWrapped(block.summary || 'No summary available.')
+        y += 2
+        if ((block.why_it_changed || []).length > 0) {
+          writeWrapped('Why it changed:', 10, [40, 48, 75])
+          writeBullets(block.why_it_changed)
+        }
+        if ((block.tradeoffs || []).length > 0) {
+          writeWrapped('Tradeoffs:', 10, [40, 48, 75])
+          writeBullets(block.tradeoffs)
+        }
+        if ((block.next_steps || []).length > 0) {
+          writeWrapped('Recommended next steps:', 10, [40, 48, 75])
+          writeBullets(block.next_steps)
+        }
+        if ((block.feature_notes || []).length > 0) {
+          writeWrapped('Feature-level notes:', 10, [40, 48, 75])
+          for (const note of block.feature_notes) {
+            writeKV(
+              `${note.feature} (${note.impact})`,
+              note.explanation || 'No explanation provided.'
+            )
+          }
+        }
+        if (block.disclaimer) {
+          y += 1
+          writeWrapped(`Disclaimer: ${block.disclaimer}`, 9, [110, 116, 140])
+        }
+      }
+
+      // Cover header
+      pdf.setFillColor(111, 92, 255)
+      pdf.rect(0, 0, pageWidth, 46, 'F')
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(22)
+      pdf.text('MusicGrowth Strategic Analysis', pageWidth / 2, 21, { align: 'center' })
+      pdf.setFontSize(11)
+      pdf.text('ML decisions with explainable trajectory guidance', pageWidth / 2, 31, { align: 'center' })
+
+      y = 56
+      const generatedAt = new Date().toLocaleString()
+      writeKV('Generated', generatedAt)
+      writeKV('Cluster', result.style_cluster.label)
+      writeKV('Cluster confidence', `${Number(result.style_cluster.confidence || 0).toFixed(1)}%`)
+      writeKV('Mood / Production', `${result.sound_dna.mood} / ${result.sound_dna.production_style}`)
+
+      writeSectionTitle('Sound DNA Snapshot')
+      const dnaRows = [
+        ['Tempo', `${Number(result.sound_dna.tempo || 0).toFixed(2)} bpm`],
+        ['Energy', Number(result.sound_dna.energy || 0).toFixed(3)],
+        ['Danceability', Number(result.sound_dna.danceability || 0).toFixed(3)],
+        ['Valence', Number(result.sound_dna.valence || 0).toFixed(3)],
+        ['Acousticness', Number(result.sound_dna.acousticness || 0).toFixed(3)],
+        ['Instrumentalness', Number(result.sound_dna.instrumentalness || 0).toFixed(3)],
+        ['Liveness', Number(result.sound_dna.liveness || 0).toFixed(3)],
+        ['Speechiness', Number(result.sound_dna.speechiness || 0).toFixed(3)],
+        ['Loudness', `${Number(result.sound_dna.loudness || 0).toFixed(3)} dB`],
+      ]
+      for (const [label, value] of dnaRows) {
+        writeKV(label, value)
+      }
+
+      writeSectionTitle('Top Similar References')
+      const similarRows = (result.top_similar || []).slice(0, 5)
+      if (similarRows.length === 0) {
+        writeWrapped('No similar references found in the current output.')
+      } else {
+        let rank = 1
+        for (const item of similarRows) {
+          writeKV(
+            `#${rank}`,
+            `${item.artist} - ${item.song} | ${item.cluster} | Similarity ${Number(item.similarity || 0).toFixed(2)}%`
+          )
+          rank += 1
+        }
+      }
+
+      writeSectionTitle('Key Differences vs Cluster')
+      const differences = [...(result.differences || [])]
+        .sort((a, b) => Math.abs(Number(b.delta_percent || 0)) - Math.abs(Number(a.delta_percent || 0)))
+        .slice(0, 6)
+      if (differences.length === 0) {
+        writeWrapped('No difference insights are available.')
+      } else {
+        for (const diff of differences) {
+          writeKV(
+            diff.feature,
+            `You ${Number(diff.song_value || 0).toFixed(3)} vs Ref ${Number(diff.reference_mean || 0).toFixed(3)} (${Number(diff.delta_percent || 0).toFixed(1)}%)`
+          )
+          writeWrapped(diff.interpretation || '', 9, [88, 96, 124], 4.5)
+        }
+      }
+
+      writeSectionTitle('Market Gaps & Strategic Paths')
+      writeWrapped('Market gaps:')
+      writeBullets(result.market_gaps || ['No market gaps available.'])
+      writeWrapped('Strategic paths:')
+      for (const path of result.paths || []) {
+        writeKV(`${path.id} - ${path.title}`, path.strategy)
+        writeWrapped(`Expected: ${path.expected}`, 9, [88, 96, 124], 4.5)
+        writeWrapped(`Tradeoff: ${path.tradeoff}`, 9, [88, 96, 124], 4.5)
+        writeBullets(path.actions || [])
+      }
+
+      if (simResult || optResult) {
+        writeSectionTitle('Trajectory Simulation Summary')
+        if (optResult) {
+          writeKV('Objective', optResult.objective === 'opportunity' ? 'Max Opportunity' : 'Max Similarity')
+          writeKV(
+            'Score improvement',
+            optResult.objective === 'opportunity'
+              ? formatOpportunity(optResult.improvement)
+              : Number(optResult.improvement || 0).toFixed(3)
+          )
+        }
+
+        const sim = simResult || optResult?.simulation
+        if (sim) {
+          writeKV('Cluster transition', `${sim.before.style_cluster.label} -> ${sim.after.style_cluster.label}`)
+          writeKV('Similarity delta', `${Number(sim.similarity_delta || 0).toFixed(2)}`)
+          writeKV('Opportunity delta', formatOpportunity(sim.opportunity_delta || 0))
+          writeWrapped('Simulation insights:')
+          writeBullets(sim.insights || [])
+
+          if ((sim.adjustments_applied || []).length > 0) {
+            writeWrapped('Applied adjustments:')
+            for (const row of sim.adjustments_applied) {
+              writeKV(
+                row.feature,
+                `${Number(row.before || 0).toFixed(3)} -> ${Number(row.after || 0).toFixed(3)} (delta ${Number(row.delta || 0).toFixed(3)})`
+              )
+            }
+          }
+        }
+      }
+
+      writeExplainability('Trajectory Explainability', simResult?.explainability || optResult?.explainability)
+
+      // Footer with page numbers
+      const totalPages = pdf.getNumberOfPages()
+      for (let page = 1; page <= totalPages; page += 1) {
+        pdf.setPage(page)
+        pdf.setFontSize(9)
+        pdf.setTextColor(120, 126, 150)
+        pdf.text(`Page ${page} of ${totalPages}`, pageWidth - margin, pageHeight - 6, { align: 'right' })
+      }
+
+      const safeLabel = String(result.style_cluster.label || 'analysis').replace(/[^a-z0-9_-]+/gi, '_')
+      pdf.save(`MusicGrowth-Report-${safeLabel}.pdf`)
     } catch (err) {
       console.error('PDF export error:', err)
       alert('Failed to export PDF. Please try again.')
@@ -155,6 +338,72 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
 
   function formatOpportunity(value) {
     return Number(value || 0).toFixed(5)
+  }
+
+  function renderExplainability(explainability) {
+    if (!explainability) return null
+
+    return (
+      <div className="explainability-panel">
+        <div className="explainability-header">
+          <h4>Why this recommendation?</h4>
+          <span className={`explainability-source source-${explainability.source || 'ml-local'}`}>
+            {explainability.source === 'openai' ? 'OpenAI explanation layer' : 'ML-generated explanation'}
+          </span>
+        </div>
+
+        <p className="explainability-summary">{explainability.summary || 'No explanation summary available.'}</p>
+
+        <div className="explainability-grid">
+          <div className="explainability-card">
+            <h5>Why it changed</h5>
+            <ul>
+              {(explainability.why_it_changed || []).map((line, idx) => (
+                <li key={idx}>{line}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="explainability-card">
+            <h5>Tradeoffs</h5>
+            <ul>
+              {(explainability.tradeoffs || []).map((line, idx) => (
+                <li key={idx}>{line}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="explainability-card">
+            <h5>Next steps</h5>
+            <ul>
+              {(explainability.next_steps || []).map((line, idx) => (
+                <li key={idx}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {(explainability.feature_notes || []).length > 0 && (
+          <div className="feature-notes-grid">
+            {(explainability.feature_notes || []).map((note, idx) => (
+              <div key={`${note.feature}-${idx}`} className="feature-note-card">
+                <div className="feature-note-head">
+                  <strong>{note.feature || 'Feature'}</strong>
+                  <span className={`feature-note-pill ${note.impact === 'increase' ? 'pill-up' : 'pill-down'}`}>
+                    {note.impact === 'increase' ? 'Increased' : 'Decreased'}
+                  </span>
+                </div>
+                <p>{note.explanation || 'No feature note available.'}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="explainability-footer">
+          Confidence: <strong>{Number(explainability.confidence || 0).toFixed(3)}</strong> | {explainability.disclaimer || 'ML explanation only.'}
+        </p>
+      </div>
+    )
   }
 
   function updateAdjustment(feature, rawValue) {
@@ -560,6 +809,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                     {optResult.objective === 'opportunity' ? formatOpportunity(optResult.improvement) : Number(optResult.improvement || 0).toFixed(3)}
                   </li>
                 </ul>
+                {renderExplainability(optResult.explainability)}
               </div>
             )}
 
@@ -594,6 +844,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                       <li key={idx}>{line}</li>
                     ))}
                   </ul>
+                  {renderExplainability(simResult.explainability)}
                 </div>
 
                 <div className="sim-after-list">

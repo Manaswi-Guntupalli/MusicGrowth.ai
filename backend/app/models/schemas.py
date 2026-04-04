@@ -74,6 +74,23 @@ class TrajectoryFeatureChange(BaseModel):
     delta: float
 
 
+class TrajectoryFeatureExplanation(BaseModel):
+    feature: str
+    impact: str
+    explanation: str
+
+
+class TrajectoryExplainability(BaseModel):
+    source: str
+    summary: str
+    why_it_changed: list[str]
+    tradeoffs: list[str]
+    next_steps: list[str]
+    feature_notes: list[TrajectoryFeatureExplanation]
+    confidence: float
+    disclaimer: str
+
+
 class TrajectorySnapshot(BaseModel):
     style_cluster: StyleClusterPrediction
     avg_similarity: float
@@ -91,6 +108,7 @@ class TrajectorySimulationResponse(BaseModel):
     opportunity_delta: float
     adjustments_applied: list[TrajectoryFeatureChange]
     insights: list[str]
+    explainability: TrajectoryExplainability
 
 
 class TrajectoryOptimizationRequest(BaseModel):
@@ -106,6 +124,7 @@ class TrajectoryOptimizationResponse(BaseModel):
     improvement: float
     recommended_adjustments: list[TrajectoryFeatureChange]
     simulation: TrajectorySimulationResponse
+    explainability: TrajectoryExplainability
 
 
 class UserRegisterRequest(BaseModel):

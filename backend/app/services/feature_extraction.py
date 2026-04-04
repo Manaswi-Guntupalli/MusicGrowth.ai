@@ -80,7 +80,7 @@ def select_best_segment(y: np.ndarray, sr: int, segment_seconds: int = 30) -> np
 
 def extract_raw_features(y: np.ndarray, sr: int) -> RawFeatures:
     tempo_arr, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
-    tempo = float(np.atleast_1d(tempo_arr).item())
+    tempo = max(1.0, float(np.atleast_1d(tempo_arr).item()))
 
     rms = librosa.feature.rms(y=y)[0]
     zcr = librosa.feature.zero_crossing_rate(y)[0]
@@ -110,7 +110,7 @@ def extract_raw_features(y: np.ndarray, sr: int) -> RawFeatures:
         zcr=float(np.mean(zcr)),
         spectral_centroid=float(np.mean(centroid)),
         spectral_bandwidth=float(np.mean(bandwidth)),
-        loudness_db=float(librosa.amplitude_to_db(np.array([np.sqrt(np.mean(y**2)) + 1e-9]), ref=1.0)[0]),
+        loudness_db=float(librosa.amplitude_to_db(np.array([float(np.mean(rms)) + 1e-9]), ref=1.0)[0]),
         chroma_mean=float(np.mean(chroma)),
         mfcc_mean=float(np.mean(mfcc[:5])),
         mfcc_mean_1=float(np.mean(mfcc[0])),

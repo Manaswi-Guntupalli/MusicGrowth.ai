@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Final
 
+from .explainability import build_trajectory_explainability
 from .similarity import cluster_membership_probabilities, get_market_profile, predict_style_cluster, top_similar
 from .sound_dna import FEATURE_ORDER, clamp01
 
@@ -166,6 +167,19 @@ def run_trajectory_simulation(base_features: dict[str, float], adjustments: dict
     else:
         insights.append("Market opportunity remains near baseline.")
 
+    explainability = build_trajectory_explainability(
+        "simulation",
+        {
+            "before": before,
+            "after": after,
+            "cluster_changed": cluster_changed,
+            "similarity_delta": similarity_delta,
+            "opportunity_delta": opportunity_delta,
+            "adjustments_applied": changes,
+            "insights": insights,
+        },
+    )
+
     return {
         "before": before,
         "after": after,
@@ -174,6 +188,7 @@ def run_trajectory_simulation(base_features: dict[str, float], adjustments: dict
         "opportunity_delta": opportunity_delta,
         "adjustments_applied": changes,
         "insights": insights,
+        "explainability": explainability,
     }
 
 
@@ -256,6 +271,17 @@ def run_auto_optimize(
 
     simulation = run_trajectory_simulation(baseline, recommended_adjustments)
     optimized_score = _objective_value(best_snapshot, objective)
+    explainability = build_trajectory_explainability(
+        "optimization",
+        {
+            "objective": objective,
+            "baseline": baseline_snapshot,
+            "simulation": simulation,
+            "optimized_score": optimized_score,
+            "improvement": optimized_score - _objective_value(baseline_snapshot, objective),
+            "recommended_adjustments": simulation["adjustments_applied"],
+        },
+    )
 
     return {
         "objective": objective,
@@ -264,4 +290,5 @@ def run_auto_optimize(
         "improvement": round(optimized_score - _objective_value(baseline_snapshot, objective), 6),
         "recommended_adjustments": simulation["adjustments_applied"],
         "simulation": simulation,
+        "explainability": explainability,
     }
