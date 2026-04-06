@@ -8,6 +8,26 @@ Use this when you want the project running fast with minimum confusion.
 2. Install Node.js 18+
 3. Install MongoDB Community Server
 
+## A.1 Security Env Setup (Required)
+
+From project root:
+
+- Copy-Item .\.env.example .\.env
+
+Edit `.env` and set required secret:
+
+- JWT_SECRET_KEY=your-random-32-plus-character-secret
+
+Optional override in current PowerShell session:
+
+- $env:JWT_SECRET_KEY="your-random-32-plus-character-secret"
+
+Notes:
+
+- `JWT_SECRET_KEY` is required
+- Minimum length is 32 characters
+- Placeholder values are rejected at startup
+
 ## B. Start MongoDB
 
 If installed as a service, ensure it is running.
@@ -98,6 +118,12 @@ Issue: MongoDB connection fails
 
 - Start MongoDB service
 - Check with mongosh
+
+Issue: backend fails immediately on startup due to JWT config
+
+- Ensure `.env` exists in project root
+- Ensure `JWT_SECRET_KEY` is set (32+ chars)
+- Avoid placeholder values
 
 Issue: no similar songs or weird matches
 

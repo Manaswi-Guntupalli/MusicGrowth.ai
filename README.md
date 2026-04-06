@@ -35,6 +35,26 @@ Verify in terminal:
 - node --version
 - npm --version
 
+## 2.1 Configure Environment (Required)
+
+Before starting backend, create `.env` from template at project root:
+
+- Copy `.env.example` to `.env`
+- Edit `.env` and set `JWT_SECRET_KEY` to a strong value (at least 32 characters)
+
+PowerShell example:
+
+- Copy-Item .\.env.example .\.env
+- $env:JWT_SECRET_KEY="your-random-32-plus-character-secret"
+
+Note: PowerShell variable is useful for quick overrides. The recommended baseline is storing `JWT_SECRET_KEY` in `.env`.
+
+Security fail-fast behavior:
+
+- Backend startup will fail if `JWT_SECRET_KEY` is missing
+- Backend startup will fail if `JWT_SECRET_KEY` is a known placeholder
+- Backend startup will fail if `JWT_SECRET_KEY` is shorter than 32 characters
+
 ## 3. Start MongoDB
 
 If MongoDB is installed as a Windows service, ensure it is running.
@@ -150,11 +170,13 @@ Optional environment variables:
 
 ## 9. Optional Environment Variables
 
+`JWT_SECRET_KEY` is required. The rest are optional unless you override defaults.
+
 You can set these before running backend:
 
 - MONGO_URI (default mongodb://127.0.0.1:27017)
 - MONGO_DB_NAME (default musicgrowth)
-- JWT_SECRET_KEY (change this in production)
+- JWT_SECRET_KEY (required, minimum 32 characters)
 - JWT_EXPIRE_MINUTES (default 43200)
 - SPOTIFY_DATASET_APRIL
 - SPOTIFY_DATASET_NOV
@@ -164,7 +186,7 @@ PowerShell example:
 
 - $env:MONGO_URI="mongodb://127.0.0.1:27017"
 - $env:MONGO_DB_NAME="musicgrowth"
-- $env:JWT_SECRET_KEY="replace-with-strong-secret"
+- $env:JWT_SECRET_KEY="replace-with-a-random-32-plus-character-secret"
 
 ## 10. One-Command Smoke Tests
 
@@ -199,6 +221,14 @@ Fix:
 
 - Login first in UI
 - Or send Authorization: Bearer TOKEN header in API calls
+
+Issue: backend fails on startup due to JWT secret validation
+
+Fix:
+
+- Ensure `.env` exists at project root (copy from `.env.example`)
+- Set `JWT_SECRET_KEY` in `.env` or shell env
+- Use at least 32 characters and avoid placeholder values
 
 Issue: backend cannot connect to MongoDB
 

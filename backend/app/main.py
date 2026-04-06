@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .core.config import validate_startup_environment
 from .db.mongodb import init_indexes
 from .routers.analysis import router as analysis_router
 from .routers.auth import router as auth_router
@@ -23,6 +24,7 @@ def health() -> dict[str, str]:
 
 @app.on_event("startup")
 async def startup() -> None:
+    validate_startup_environment()
     await init_indexes()
 
 
