@@ -1,18 +1,12 @@
 import argparse
 import os
-import sys
 from datetime import UTC, datetime
-from pathlib import Path
 
 from bson import ObjectId
 from bson.errors import InvalidId
 from pymongo import MongoClient
 
-BACKEND_ROOT = Path(__file__).resolve().parent / "backend"
-if str(BACKEND_ROOT) not in sys.path:
-    sys.path.append(str(BACKEND_ROOT))
-
-from app.models.schemas import AnalysisHistoryItem, AnalysisResponse
+from backend.app.models.schemas import AnalysisHistoryItem, AnalysisResponse
 
 
 def parse_args() -> argparse.Namespace:
