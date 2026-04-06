@@ -130,6 +130,11 @@ Issue: no similar songs or weird matches
 - Verify both Spotify CSV datasets exist in project root
 - Ensure files are not corrupted
 
+Issue: upload fails with file too large
+
+- Increase `MAX_UPLOAD_SIZE_BYTES` in `.env` if larger uploads are required
+- Keep `UPLOAD_CHUNK_SIZE_BYTES` less than or equal to `MAX_UPLOAD_SIZE_BYTES`
+
 ## I. Demo-Day Startup Order (Mandatory)
 
 1. Start MongoDB

@@ -178,6 +178,8 @@ You can set these before running backend:
 - MONGO_DB_NAME (default musicgrowth)
 - JWT_SECRET_KEY (required, minimum 32 characters)
 - JWT_EXPIRE_MINUTES (default 43200)
+- MAX_UPLOAD_SIZE_BYTES (default 26214400 for 25 MB)
+- UPLOAD_CHUNK_SIZE_BYTES (default 1048576 for 1 MB chunks)
 - SPOTIFY_DATASET_APRIL
 - SPOTIFY_DATASET_NOV
 - SPOTIFY_MIN_POPULARITY
@@ -187,6 +189,8 @@ PowerShell example:
 - $env:MONGO_URI="mongodb://127.0.0.1:27017"
 - $env:MONGO_DB_NAME="musicgrowth"
 - $env:JWT_SECRET_KEY="replace-with-a-random-32-plus-character-secret"
+- $env:MAX_UPLOAD_SIZE_BYTES="26214400"
+- $env:UPLOAD_CHUNK_SIZE_BYTES="1048576"
 
 ## 10. One-Command Smoke Tests
 

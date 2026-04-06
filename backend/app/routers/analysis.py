@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -7,7 +8,9 @@ from tempfile import NamedTemporaryFile
 from bson import ObjectId
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import ValidationError
+import soundfile as sf
 
+from ..core.config import MAX_UPLOAD_SIZE_BYTES, UPLOAD_CHUNK_SIZE_BYTES
 from ..db.mongodb import get_db
 from ..dependencies.auth import get_current_user
 from ..models.schemas import (
@@ -22,8 +25,72 @@ from ..services.pipeline import run_analysis
 from ..services.trajectory import run_auto_optimize, run_trajectory_simulation
 
 router = APIRouter(tags=["analysis"])
+logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".ogg"}
+
+
+def _max_upload_size_mb() -> int:
+    return max(1, int(MAX_UPLOAD_SIZE_BYTES / (1024 * 1024)))
+
+
+async def _write_upload_to_temp_file(file: UploadFile, suffix: str) -> tuple[str, int]:
+    tmp_path: str | None = None
+    total_size = 0
+
+    try:
+        with NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp_path = tmp.name
+
+            while True:
+                chunk = await file.read(UPLOAD_CHUNK_SIZE_BYTES)
+                if not chunk:
+                    break
+
+                total_size += len(chunk)
+                if total_size > MAX_UPLOAD_SIZE_BYTES:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File too large. Maximum upload size is {_max_upload_size_mb()} MB.",
+                    )
+
+                tmp.write(chunk)
+    except Exception:
+        if tmp_path:
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
+
+    if total_size <= 0:
+        if tmp_path:
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    if tmp_path is None:
+        raise HTTPException(status_code=500, detail="Failed to store uploaded file.")
+
+    return tmp_path, total_size
+
+
+def _validate_uploaded_audio_file(audio_path: str) -> None:
+    try:
+        info = sf.info(audio_path)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded audio could not be parsed. The file may be corrupted or unsupported.",
+        ) from exc
+
+    if info.frames <= 0 or info.samplerate <= 0 or info.channels <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded audio appears empty or corrupted.",
+        )
 
 
 @router.post("/analyze", response_model=AnalysisResponse)
@@ -40,12 +107,12 @@ async def analyze_song(
         raise HTTPException(status_code=400, detail="segment_mode must be 'best' or 'full'.")
 
     suffix = extension if extension else ".wav"
-    with NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp_path = tmp.name
-        content = await file.read()
-        tmp.write(content)
+    tmp_path: str | None = None
 
     try:
+        tmp_path, _ = await _write_upload_to_temp_file(file=file, suffix=suffix)
+        _validate_uploaded_audio_file(tmp_path)
+
         result = run_analysis(tmp_path, segment_mode=segment_mode)
         db = get_db()
         doc = {
@@ -58,13 +125,25 @@ async def analyze_song(
         inserted = await db.song_analyses.insert_one(doc)
         result["analysis_id"] = str(inserted.inserted_id)
         return AnalysisResponse(**result)
+    except HTTPException:
+        raise
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        logger.warning("Audio analysis validation failed for file=%s user=%s", file.filename, current_user.get("id"))
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to analyze this audio file. Please upload a valid, non-corrupted music track.",
+        ) from exc
     except Exception as exc:  # pragma: no cover - safe API guard
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {exc}") from exc
+        logger.exception("Audio analysis failed unexpectedly for file=%s user=%s", file.filename, current_user.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="Analysis failed due to an internal error. Please try again.",
+        ) from exc
     finally:
+        await file.close()
         try:
-            Path(tmp_path).unlink(missing_ok=True)
+            if tmp_path:
+                Path(tmp_path).unlink(missing_ok=True)
         except OSError:
             pass
 
@@ -112,7 +191,11 @@ async def simulate_trajectory(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - safe API guard
-        raise HTTPException(status_code=500, detail=f"Trajectory simulation failed: {exc}") from exc
+        logger.exception("Trajectory simulation failed unexpectedly for user=%s", current_user.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="Trajectory simulation failed due to an internal error. Please try again.",
+        ) from exc
 
 
 @router.post("/optimize-trajectory", response_model=TrajectoryOptimizationResponse)
@@ -132,4 +215,8 @@ async def optimize_trajectory(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - safe API guard
-        raise HTTPException(status_code=500, detail=f"Trajectory optimization failed: {exc}") from exc
+        logger.exception("Trajectory optimization failed unexpectedly for user=%s", current_user.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="Trajectory optimization failed due to an internal error. Please try again.",
+        ) from exc
