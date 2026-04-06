@@ -155,18 +155,21 @@ The similarity engine reads these CSV files from workspace root:
 
 - .\SpotifyAudioFeaturesApril2019.csv
 - .\SpotifyAudioFeaturesNov2018.csv
+- .\SpotifyAudioFeatures2020.csv (optional newer snapshot)
 
 Behavior:
 
 - Deduplicates using track_id
-- Filters low popularity tracks (default minimum 35)
+- Keeps the latest snapshot row when duplicate track_id exists
+- Filters low popularity tracks (default minimum 30)
 - Computes cosine similarity against normalized features
 
 Optional environment variables:
 
 - SPOTIFY_DATASET_APRIL (override path)
 - SPOTIFY_DATASET_NOV (override path)
-- SPOTIFY_MIN_POPULARITY (number, default 35)
+- SPOTIFY_DATASET_PATHS (semicolon/comma-separated list of CSV paths)
+- SPOTIFY_MIN_POPULARITY (number, default 30)
 
 ## 9. Optional Environment Variables
 
@@ -182,6 +185,7 @@ You can set these before running backend:
 - UPLOAD_CHUNK_SIZE_BYTES (default 1048576 for 1 MB chunks)
 - SPOTIFY_DATASET_APRIL
 - SPOTIFY_DATASET_NOV
+- SPOTIFY_DATASET_PATHS
 - SPOTIFY_MIN_POPULARITY
 
 PowerShell example:
@@ -291,7 +295,7 @@ Validate history documents against backend schemas:
 Verify popularity filtering behavior on dataset rows:
 
 ```powershell
-& .\.venv\Scripts\python.exe .\backend\scripts\verify_popularity.py --min-popularity 35 --max-rows 50000
+& .\.venv\Scripts\python.exe .\backend\scripts\verify_popularity.py --min-popularity 30 --max-rows 50000
 ```
 
 Quick help for available script flags:
@@ -301,5 +305,40 @@ Quick help for available script flags:
 & .\.venv\Scripts\python.exe .\_debug_history_validation.py --help
 & .\.venv\Scripts\python.exe .\backend\scripts\verify_popularity.py --help
 ```
+
+## 14. Dataset Refresh + Quality Audit (Reproducible)
+
+Run from project root.
+
+1. Ingest newer Spotify snapshot into project schema:
+
+```powershell
+& .\.venv\Scripts\python.exe .\backend\scripts\ingest_newer_spotify_data.py --force
+```
+
+2. Generate data quality report (missing values, outliers, cluster balance):
+
+```powershell
+& .\.venv\Scripts\python.exe .\backend\scripts\generate_data_quality_report.py
+```
+
+3. Rebuild reference dataset + clustering artifacts with recommended popularity threshold:
+
+```powershell
+$env:SPOTIFY_MIN_POPULARITY="30"
+& .\.venv\Scripts\python.exe .\backend\scripts\build_reference_dataset.py
+& .\.venv\Scripts\python.exe .\backend\scripts\train_similarity_model.py
+```
+
+Generated reports and artifacts:
+
+- .\backend\app\data\models\data_quality_report.json
+- .\backend\app\data\models\data_quality_report.md
+- .\backend\app\data\models\reference_dataset.json
+- .\backend\app\data\models\sound_dna_matrix.npy
+- .\backend\app\data\models\scaler.pkl
+- .\backend\app\data\models\kmeans.pkl
+- .\backend\app\data\models\cluster_labels.json
+- .\backend\app\data\models\market_profile.json
 
 That is the full production-like local run flow for this project.

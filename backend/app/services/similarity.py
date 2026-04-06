@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -38,8 +39,10 @@ def _build_reference_from_row(row: dict) -> dict | None:
 
     features = build_spotify_features(row)
 
-    artist_name = row.get("artist_name") or row.get("artist") or "Unknown Artist"
+    artist_name = row.get("artist_name") or row.get("track_artist") or row.get("artist") or "Unknown Artist"
     track_name = row.get("track_name") or row.get("song") or "Unknown Track"
+
+    popularity = safe_float(row, "popularity", safe_float(row, "track_popularity", 0.0))
 
     return {
         "artist": artist_name,
@@ -47,15 +50,114 @@ def _build_reference_from_row(row: dict) -> dict | None:
         "track_id": row.get("track_id", ""),
         "cluster": "unknown",
         "features": features,
-        "popularity": safe_float(row, "popularity", 0.0),
+        "popularity": popularity,
     }
 
 
 def _dataset_paths() -> list[Path]:
     workspace_root = Path(__file__).resolve().parents[3]
-    april = Path(os.getenv("SPOTIFY_DATASET_APRIL", workspace_root / "SpotifyAudioFeaturesApril2019.csv"))
+    explicit_paths_raw = os.getenv("SPOTIFY_DATASET_PATHS", "")
+
+    candidates: list[Path] = []
+    if explicit_paths_raw.strip():
+        tokens = [part.strip() for part in re.split(r"[;,]", explicit_paths_raw) if part.strip()]
+        candidates.extend(Path(token) for token in tokens)
+
     nov = Path(os.getenv("SPOTIFY_DATASET_NOV", workspace_root / "SpotifyAudioFeaturesNov2018.csv"))
-    return [april, nov]
+    april = Path(os.getenv("SPOTIFY_DATASET_APRIL", workspace_root / "SpotifyAudioFeaturesApril2019.csv"))
+    candidates.extend([nov, april])
+
+    # Auto-discover additional/recent snapshots dropped in workspace root.
+    candidates.extend(sorted(workspace_root.glob("SpotifyAudioFeatures*.csv")))
+
+    unique_paths: list[Path] = []
+    seen: set[str] = set()
+    for path in candidates:
+        key = str(path.resolve())
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_paths.append(path)
+
+    def sort_key(path: Path) -> tuple[int, str]:
+        years = [int(match) for match in re.findall(r"(?:19|20)\d{2}", path.name)]
+        year_hint = max(years) if years else 0
+        return year_hint, path.name.lower()
+
+    # Oldest to newest. Dedupe logic keeps the latest snapshot when IDs overlap.
+    return sorted(unique_paths, key=sort_key)
+
+
+def _collect_reference_rows(min_popularity: float) -> tuple[list[dict], dict[str, object]]:
+    paths = _dataset_paths()
+
+    by_track_id: dict[str, tuple[int, dict]] = {}
+    without_track_id: list[dict] = []
+
+    source_stats: dict[str, dict[str, int]] = {
+        str(path): {
+            "rows_scanned": 0,
+            "rows_valid": 0,
+            "rows_filtered_popularity": 0,
+            "rows_duplicate_track_id": 0,
+        }
+        for path in paths
+    }
+
+    rows_after_filter = 0
+    track_id_title_collisions = 0
+
+    for source_idx, path in enumerate(paths):
+        if not path.exists():
+            continue
+
+        path_key = str(path)
+        with path.open("r", encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                source_stats[path_key]["rows_scanned"] += 1
+
+                entry = _build_reference_from_row(row)
+                if entry is None:
+                    continue
+
+                source_stats[path_key]["rows_valid"] += 1
+                if entry["popularity"] < min_popularity:
+                    source_stats[path_key]["rows_filtered_popularity"] += 1
+                    continue
+
+                rows_after_filter += 1
+                track_id = str(entry.get("track_id", "") or "").strip()
+                if not track_id:
+                    without_track_id.append(entry)
+                    continue
+
+                previous = by_track_id.get(track_id)
+                if previous is not None:
+                    source_stats[path_key]["rows_duplicate_track_id"] += 1
+                    _, prev_entry = previous
+                    if (str(prev_entry.get("artist", "")).strip().lower(), str(prev_entry.get("song", "")).strip().lower()) != (
+                        str(entry.get("artist", "")).strip().lower(),
+                        str(entry.get("song", "")).strip().lower(),
+                    ):
+                        track_id_title_collisions += 1
+
+                # Keep latest snapshot version for the same track_id.
+                by_track_id[track_id] = (source_idx, entry)
+
+    refs = [value[1] for value in by_track_id.values()] + without_track_id
+
+    stats: dict[str, object] = {
+        "dataset_paths": [str(path) for path in paths],
+        "rows_after_filter": rows_after_filter,
+        "rows_kept": len(refs),
+        "rows_deduped": rows_after_filter - len(by_track_id) - len(without_track_id),
+        "unique_track_ids": len(by_track_id),
+        "rows_without_track_id": len(without_track_id),
+        "track_id_title_collisions": track_id_title_collisions,
+        "source_stats": source_stats,
+    }
+    return refs, stats
 
 
 def _ensure_model_dir() -> None:
@@ -187,30 +289,8 @@ def load_reference_dataset() -> list[dict]:
         with REFERENCE_DATASET_PATH.open("r", encoding="utf-8") as f:
             return json.load(f)
 
-    min_popularity = float(os.getenv("SPOTIFY_MIN_POPULARITY", "35"))
-    seen_track_ids: set[str] = set()
-    refs: list[dict] = []
-
-    for path in _dataset_paths():
-        if not path.exists():
-            continue
-
-        with path.open("r", encoding="utf-8", newline="") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                entry = _build_reference_from_row(row)
-                if entry is None:
-                    continue
-
-                track_id = entry["track_id"]
-                if track_id and track_id in seen_track_ids:
-                    continue
-                if entry["popularity"] < min_popularity:
-                    continue
-
-                if track_id:
-                    seen_track_ids.add(track_id)
-                refs.append(entry)
+    min_popularity = float(os.getenv("SPOTIFY_MIN_POPULARITY", "30"))
+    refs, _ = _collect_reference_rows(min_popularity=min_popularity)
 
     if refs:
         return refs

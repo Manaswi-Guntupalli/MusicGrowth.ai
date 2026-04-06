@@ -16,7 +16,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-popularity",
         type=float,
-        default=float(os.getenv("SPOTIFY_MIN_POPULARITY", "35")),
+        default=float(os.getenv("SPOTIFY_MIN_POPULARITY", "30")),
         help="Minimum popularity threshold applied to rows",
     )
     parser.add_argument(

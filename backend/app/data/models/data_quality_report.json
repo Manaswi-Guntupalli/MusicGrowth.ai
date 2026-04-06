@@ -1,0 +1,392 @@
+{
+  "generated_at_utc": "2026-04-06T17:36:51.017628+00:00",
+  "cluster_count": 10,
+  "dataset_paths": [
+    "D:\\MusicGrowth.ai\\SpotifyAudioFeaturesNov2018.csv",
+    "D:\\MusicGrowth.ai\\SpotifyAudioFeaturesApril2019.csv",
+    "D:\\MusicGrowth.ai\\SpotifyAudioFeatures2020.csv"
+  ],
+  "raw_source_checks": {
+    "D:\\MusicGrowth.ai\\SpotifyAudioFeaturesNov2018.csv": {
+      "exists": true,
+      "rows_total": 116372,
+      "missing_fields": {
+        "track_artist": 116372,
+        "track_popularity": 116372
+      },
+      "invalid_numeric_fields": {},
+      "missing_track_id": 0,
+      "invalid_tempo_rows": 255
+    },
+    "D:\\MusicGrowth.ai\\SpotifyAudioFeaturesApril2019.csv": {
+      "exists": true,
+      "rows_total": 130663,
+      "missing_fields": {
+        "track_artist": 130663,
+        "track_popularity": 130663
+      },
+      "invalid_numeric_fields": {},
+      "missing_track_id": 0,
+      "invalid_tempo_rows": 292
+    },
+    "D:\\MusicGrowth.ai\\SpotifyAudioFeatures2020.csv": {
+      "exists": true,
+      "rows_total": 32832,
+      "missing_fields": {
+        "track_artist": 32832,
+        "track_popularity": 32832
+      },
+      "invalid_numeric_fields": {},
+      "missing_track_id": 0,
+      "invalid_tempo_rows": 0
+    }
+  },
+  "threshold_comparison": [
+    {
+      "min_popularity": 20.0,
+      "rows_kept": 98136,
+      "rows_after_filter": 160250,
+      "rows_deduped": 62114,
+      "dedupe_retention_ratio": 0.612393135725429,
+      "track_id_title_collisions": 610,
+      "popularity_stats": {
+        "min": 20.0,
+        "max": 100.0,
+        "mean": 40.220204614005056,
+        "median": 37.0,
+        "p10": 22.0,
+        "p25": 27.0,
+        "p50": 37.0,
+        "p75": 51.0,
+        "p90": 62.0
+      },
+      "outliers": {
+        "rows_with_any_outlier": 37622,
+        "row_outlier_ratio": 0.38336594114290373,
+        "outliers_by_feature": {
+          "tempo": 274,
+          "energy": 0,
+          "danceability": 699,
+          "valence": 0,
+          "acousticness": 0,
+          "instrumentalness": 21904,
+          "liveness": 6985,
+          "speechiness": 10830,
+          "loudness": 6714,
+          "mfcc_mean_1": 6384,
+          "mfcc_mean_2": 4701,
+          "mfcc_mean_3": 1,
+          "mfcc_mean_4": 5654,
+          "mfcc_mean_5": 16366
+        }
+      },
+      "cluster_balance": {
+        "cluster_count": 10,
+        "min_cluster_size": 4540,
+        "max_cluster_size": 19508,
+        "imbalance_ratio": 4.296916299559471,
+        "counts": {
+          "0": 15939,
+          "1": 4964,
+          "2": 7338,
+          "3": 12416,
+          "4": 11383,
+          "5": 8568,
+          "6": 4540,
+          "7": 4575,
+          "8": 19508,
+          "9": 8905
+        }
+      }
+    },
+    {
+      "min_popularity": 25.0,
+      "rows_kept": 83933,
+      "rows_after_filter": 135245,
+      "rows_deduped": 51312,
+      "dedupe_retention_ratio": 0.6205996524825317,
+      "track_id_title_collisions": 595,
+      "popularity_stats": {
+        "min": 25.0,
+        "max": 100.0,
+        "mean": 43.50964459747656,
+        "median": 41.0,
+        "p10": 27.0,
+        "p25": 32.0,
+        "p50": 41.0,
+        "p75": 53.0,
+        "p90": 64.0
+      },
+      "outliers": {
+        "rows_with_any_outlier": 31790,
+        "row_outlier_ratio": 0.3787544827421872,
+        "outliers_by_feature": {
+          "tempo": 235,
+          "energy": 0,
+          "danceability": 750,
+          "valence": 0,
+          "acousticness": 0,
+          "instrumentalness": 18821,
+          "liveness": 5919,
+          "speechiness": 8877,
+          "loudness": 4898,
+          "mfcc_mean_1": 4678,
+          "mfcc_mean_2": 3920,
+          "mfcc_mean_3": 15,
+          "mfcc_mean_4": 5203,
+          "mfcc_mean_5": 12910
+        }
+      },
+      "cluster_balance": {
+        "cluster_count": 10,
+        "min_cluster_size": 3001,
+        "max_cluster_size": 17040,
+        "imbalance_ratio": 5.678107297567477,
+        "counts": {
+          "0": 17040,
+          "1": 7860,
+          "2": 3001,
+          "3": 9872,
+          "4": 3754,
+          "5": 13910,
+          "6": 6041,
+          "7": 3847,
+          "8": 7546,
+          "9": 11062
+        }
+      }
+    },
+    {
+      "min_popularity": 30.0,
+      "rows_kept": 70177,
+      "rows_after_filter": 111353,
+      "rows_deduped": 41176,
+      "dedupe_retention_ratio": 0.6302210088637037,
+      "track_id_title_collisions": 590,
+      "popularity_stats": {
+        "min": 30.0,
+        "max": 100.0,
+        "mean": 46.930019807059296,
+        "median": 45.0,
+        "p10": 32.0,
+        "p25": 36.0,
+        "p50": 45.0,
+        "p75": 56.0,
+        "p90": 65.0
+      },
+      "outliers": {
+        "rows_with_any_outlier": 26409,
+        "row_outlier_ratio": 0.3763198768827394,
+        "outliers_by_feature": {
+          "tempo": 205,
+          "energy": 318,
+          "danceability": 682,
+          "valence": 0,
+          "acousticness": 0,
+          "instrumentalness": 15691,
+          "liveness": 4879,
+          "speechiness": 7221,
+          "loudness": 3707,
+          "mfcc_mean_1": 3469,
+          "mfcc_mean_2": 3309,
+          "mfcc_mean_3": 27,
+          "mfcc_mean_4": 4475,
+          "mfcc_mean_5": 9885
+        }
+      },
+      "cluster_balance": {
+        "cluster_count": 10,
+        "min_cluster_size": 2181,
+        "max_cluster_size": 14661,
+        "imbalance_ratio": 6.722145804676754,
+        "counts": {
+          "0": 14661,
+          "1": 6430,
+          "2": 8572,
+          "3": 4415,
+          "4": 6469,
+          "5": 2181,
+          "6": 9609,
+          "7": 3141,
+          "8": 11788,
+          "9": 2911
+        }
+      }
+    },
+    {
+      "min_popularity": 35.0,
+      "rows_kept": 57374,
+      "rows_after_filter": 89954,
+      "rows_deduped": 32580,
+      "dedupe_retention_ratio": 0.6378148831625052,
+      "track_id_title_collisions": 577,
+      "popularity_stats": {
+        "min": 35.0,
+        "max": 100.0,
+        "mean": 50.47453550388678,
+        "median": 49.0,
+        "p10": 37.0,
+        "p25": 41.0,
+        "p50": 49.0,
+        "p75": 58.0,
+        "p90": 67.0
+      },
+      "outliers": {
+        "rows_with_any_outlier": 21379,
+        "row_outlier_ratio": 0.37262523094084427,
+        "outliers_by_feature": {
+          "tempo": 166,
+          "energy": 419,
+          "danceability": 618,
+          "valence": 0,
+          "acousticness": 0,
+          "instrumentalness": 12758,
+          "liveness": 3970,
+          "speechiness": 5499,
+          "loudness": 2963,
+          "mfcc_mean_1": 2752,
+          "mfcc_mean_2": 2864,
+          "mfcc_mean_3": 22,
+          "mfcc_mean_4": 3695,
+          "mfcc_mean_5": 7230
+        }
+      },
+      "cluster_balance": {
+        "cluster_count": 10,
+        "min_cluster_size": 1490,
+        "max_cluster_size": 12047,
+        "imbalance_ratio": 8.085234899328858,
+        "counts": {
+          "0": 9871,
+          "1": 12047,
+          "2": 7208,
+          "3": 7989,
+          "4": 2217,
+          "5": 1490,
+          "6": 5499,
+          "7": 5372,
+          "8": 2574,
+          "9": 3107
+        }
+      }
+    },
+    {
+      "min_popularity": 40.0,
+      "rows_kept": 46750,
+      "rows_after_filter": 72633,
+      "rows_deduped": 25883,
+      "dedupe_retention_ratio": 0.6436468271997576,
+      "track_id_title_collisions": 567,
+      "popularity_stats": {
+        "min": 40.0,
+        "max": 100.0,
+        "mean": 53.77144385026738,
+        "median": 52.0,
+        "p10": 42.0,
+        "p25": 45.0,
+        "p50": 52.0,
+        "p75": 60.0,
+        "p90": 69.0
+      },
+      "outliers": {
+        "rows_with_any_outlier": 17185,
+        "row_outlier_ratio": 0.36759358288770055,
+        "outliers_by_feature": {
+          "tempo": 131,
+          "energy": 414,
+          "danceability": 546,
+          "valence": 0,
+          "acousticness": 675,
+          "instrumentalness": 10332,
+          "liveness": 3205,
+          "speechiness": 4068,
+          "loudness": 2368,
+          "mfcc_mean_1": 2187,
+          "mfcc_mean_2": 2469,
+          "mfcc_mean_3": 12,
+          "mfcc_mean_4": 2955,
+          "mfcc_mean_5": 5469
+        }
+      },
+      "cluster_balance": {
+        "cluster_count": 10,
+        "min_cluster_size": 1141,
+        "max_cluster_size": 9930,
+        "imbalance_ratio": 8.702892199824715,
+        "counts": {
+          "0": 1778,
+          "1": 2116,
+          "2": 9930,
+          "3": 6549,
+          "4": 1141,
+          "5": 4667,
+          "6": 2181,
+          "7": 4286,
+          "8": 8117,
+          "9": 5985
+        }
+      }
+    }
+  ],
+  "recommendation": {
+    "recommended_min_popularity": 30.0,
+    "rationale": "Selected highest threshold that keeps >=50k tracks while maintaining outlier ratio <= 0.38 and cluster imbalance <= 7.0.",
+    "details": {
+      "min_popularity": 30.0,
+      "rows_kept": 70177,
+      "rows_after_filter": 111353,
+      "rows_deduped": 41176,
+      "dedupe_retention_ratio": 0.6302210088637037,
+      "track_id_title_collisions": 590,
+      "popularity_stats": {
+        "min": 30.0,
+        "max": 100.0,
+        "mean": 46.930019807059296,
+        "median": 45.0,
+        "p10": 32.0,
+        "p25": 36.0,
+        "p50": 45.0,
+        "p75": 56.0,
+        "p90": 65.0
+      },
+      "outliers": {
+        "rows_with_any_outlier": 26409,
+        "row_outlier_ratio": 0.3763198768827394,
+        "outliers_by_feature": {
+          "tempo": 205,
+          "energy": 318,
+          "danceability": 682,
+          "valence": 0,
+          "acousticness": 0,
+          "instrumentalness": 15691,
+          "liveness": 4879,
+          "speechiness": 7221,
+          "loudness": 3707,
+          "mfcc_mean_1": 3469,
+          "mfcc_mean_2": 3309,
+          "mfcc_mean_3": 27,
+          "mfcc_mean_4": 4475,
+          "mfcc_mean_5": 9885
+        }
+      },
+      "cluster_balance": {
+        "cluster_count": 10,
+        "min_cluster_size": 2181,
+        "max_cluster_size": 14661,
+        "imbalance_ratio": 6.722145804676754,
+        "counts": {
+          "0": 14661,
+          "1": 6430,
+          "2": 8572,
+          "3": 4415,
+          "4": 6469,
+          "5": 2181,
+          "6": 9609,
+          "7": 3141,
+          "8": 11788,
+          "9": 2911
+        }
+      }
+    }
+  }
+}

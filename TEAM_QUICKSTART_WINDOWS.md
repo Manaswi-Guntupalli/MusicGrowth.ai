@@ -153,7 +153,7 @@ $env:MONGO_DB_NAME="musicgrowth"
 
 & .\.venv\Scripts\python.exe .\_debug_nonfinite.py --user-id $env:DEBUG_USER_ID --mongo-uri $env:MONGO_URI --db-name $env:MONGO_DB_NAME --limit 200
 & .\.venv\Scripts\python.exe .\_debug_history_validation.py --user-id $env:DEBUG_USER_ID --mongo-uri $env:MONGO_URI --db-name $env:MONGO_DB_NAME --limit 200
-& .\.venv\Scripts\python.exe .\backend\scripts\verify_popularity.py --min-popularity 35 --max-rows 50000
+& .\.venv\Scripts\python.exe .\backend\scripts\verify_popularity.py --min-popularity 30 --max-rows 50000
 ```
 
 Script help:
@@ -162,4 +162,14 @@ Script help:
 & .\.venv\Scripts\python.exe .\_debug_nonfinite.py --help
 & .\.venv\Scripts\python.exe .\_debug_history_validation.py --help
 & .\.venv\Scripts\python.exe .\backend\scripts\verify_popularity.py --help
+```
+
+## K. Dataset Refresh + Audit (Optional)
+
+```powershell
+& .\.venv\Scripts\python.exe .\backend\scripts\ingest_newer_spotify_data.py --force
+& .\.venv\Scripts\python.exe .\backend\scripts\generate_data_quality_report.py
+$env:SPOTIFY_MIN_POPULARITY="30"
+& .\.venv\Scripts\python.exe .\backend\scripts\build_reference_dataset.py
+& .\.venv\Scripts\python.exe .\backend\scripts\train_similarity_model.py
 ```

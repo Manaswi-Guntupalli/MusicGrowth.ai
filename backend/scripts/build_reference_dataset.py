@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import json
 import os
 import sys
@@ -12,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from app.services.similarity import _build_reference_from_row, _dataset_paths
+from app.services.similarity import _collect_reference_rows
 from app.services.sound_dna import vectorize
 
 MODEL_DIR = Path(__file__).resolve().parents[1] / "app" / "data" / "models"
@@ -21,43 +20,20 @@ MATRIX_PATH = MODEL_DIR / "sound_dna_matrix.npy"
 SCALER_PATH = MODEL_DIR / "scaler.pkl"
 
 
-def build_dataset(min_popularity: float, max_rows: int) -> list[dict]:
-    seen_track_ids: set[str] = set()
-    refs: list[dict] = []
+def build_dataset(min_popularity: float, max_rows: int) -> tuple[list[dict], dict[str, object]]:
+    refs, stats = _collect_reference_rows(min_popularity=min_popularity)
 
-    for path in _dataset_paths():
-        if not path.exists():
-            continue
+    if max_rows > 0:
+        refs = refs[:max_rows]
 
-        with path.open("r", encoding="utf-8", newline="") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                entry = _build_reference_from_row(row)
-                if entry is None:
-                    continue
-
-                if float(entry.get("popularity", 0.0)) < min_popularity:
-                    continue
-
-                track_id = str(entry.get("track_id", "") or "")
-                if track_id and track_id in seen_track_ids:
-                    continue
-
-                if track_id:
-                    seen_track_ids.add(track_id)
-                refs.append(entry)
-
-                if len(refs) >= max_rows:
-                    return refs
-
-    return refs
+    return refs, stats
 
 
 def main() -> None:
-    min_popularity = float(os.getenv("SPOTIFY_MIN_POPULARITY", "35"))
+    min_popularity = float(os.getenv("SPOTIFY_MIN_POPULARITY", "30"))
     max_rows = int(os.getenv("SPOTIFY_MAX_ROWS", "50000"))
 
-    refs = build_dataset(min_popularity=min_popularity, max_rows=max_rows)
+    refs, stats = build_dataset(min_popularity=min_popularity, max_rows=max_rows)
     if len(refs) < 10000:
         raise ValueError(f"Expected at least 10000 references, found {len(refs)}. Check CSV inputs.")
 
@@ -73,6 +49,9 @@ def main() -> None:
 
     print(f"Reference rows: {len(refs)}")
     print(f"Feature dims: {matrix.shape[1]}")
+    print(f"Rows deduped: {stats.get('rows_deduped', 0)}")
+    print(f"Rows without track_id: {stats.get('rows_without_track_id', 0)}")
+    print(f"Track-ID title collisions: {stats.get('track_id_title_collisions', 0)}")
     print(f"Saved: {REFERENCE_DATASET_PATH}")
     print(f"Saved: {MATRIX_PATH}")
     print(f"Saved: {SCALER_PATH}")
