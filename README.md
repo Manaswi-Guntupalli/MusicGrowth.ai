@@ -3,6 +3,7 @@
 If you want the shortest teammate setup path, use:
 
 - TEAM_QUICKSTART_WINDOWS.md
+- scripts/start-dev.ps1
 - scripts/preflight.ps1
 
 This document explains exactly how to run the full website end to end:
@@ -49,57 +50,51 @@ Default connection used by this app:
 - mongodb://127.0.0.1:27017
 - database name: musicgrowth
 
-## 4. Backend Setup and Run
+## 4. Full Stack Startup (Recommended)
 
-Open terminal 1.
+From project root, run the single source of truth launcher:
 
-Go to backend folder:
+- powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1
 
-- cd D:\MusicGrowth.ai\backend
+What this does:
 
-Create virtual environment once:
+- Runs preflight checks
+- Installs backend dependencies
+- Installs frontend dependencies
+- Starts backend on 127.0.0.1:8001
+- Starts frontend on 127.0.0.1:5173
+- Opens browser to the app
 
-- python -m venv ..\.venv
-
-Activate venv:
-
-- D:\MusicGrowth.ai\.venv\Scripts\activate
-
-Install backend dependencies:
-
-- python -m pip install -r requirements.txt
-
-Run backend API:
-
-- python -m uvicorn app.main:app --app-dir D:/MusicGrowth.ai/backend --host 127.0.0.1 --port 8001 --reload
-
-Health check in another terminal:
-
-- Invoke-RestMethod http://127.0.0.1:8001/api/health
-
-Expected:
-
-- {"status":"ok"}
-
-## 5. Frontend Setup and Run
-
-Open terminal 2.
-
-Go to frontend folder:
-
-- cd D:\MusicGrowth.ai\frontend
-
-Install frontend dependencies:
-
-- npm install
-
-Run frontend:
-
-- npm run dev -- --host 127.0.0.1 --port 5173
-
-Open in browser:
+Primary app URL:
 
 - http://127.0.0.1:5173
+
+Optional flags:
+
+- Skip installs: powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1 -SkipInstall
+- Skip preflight: powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1 -SkipPreflight
+- Dry run: powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1 -DryRun
+
+## 5. Manual Startup (Fallback)
+
+If you prefer manual terminals:
+
+Terminal 1 (backend):
+
+- cd .\backend
+- ..\.venv\Scripts\activate
+- python -m pip install -r requirements.txt
+- python -m uvicorn app.main:app --app-dir . --host 127.0.0.1 --port 8001 --reload
+
+Terminal 2 (frontend):
+
+- cd .\frontend
+- npm install
+- npm run dev -- --host 127.0.0.1 --port 5173
+
+Health check:
+
+- Invoke-RestMethod http://127.0.0.1:8001/api/health
 
 ## 6. Full App Flow (What You Should See)
 
@@ -138,8 +133,8 @@ Indexes are created on startup for:
 
 The similarity engine reads these CSV files from workspace root:
 
-- D:\MusicGrowth.ai\SpotifyAudioFeaturesApril2019.csv
-- D:\MusicGrowth.ai\SpotifyAudioFeaturesNov2018.csv
+- .\SpotifyAudioFeaturesApril2019.csv
+- .\SpotifyAudioFeaturesNov2018.csv
 
 Behavior:
 
@@ -182,7 +177,7 @@ Analyze with token:
 1. Save token from register response as TOKEN
 2. Run:
 
-- curl.exe -X POST "http://127.0.0.1:8001/api/analyze?segment_mode=best" -H "Authorization: Bearer TOKEN" -F "file=@D:/MusicGrowth.ai/dark_horse_remix.mp3"
+- curl.exe -X POST "http://127.0.0.1:8001/api/analyze?segment_mode=best" -H "Authorization: Bearer TOKEN" -F "file=@./dark_horse_remix.mp3"
 
 Get saved analyses:
 
@@ -194,8 +189,9 @@ Issue: frontend says package.json not found
 
 Fix:
 
-- Run commands from D:\MusicGrowth.ai\frontend
-- Or use npm --prefix D:\MusicGrowth.ai\frontend run dev -- --host 127.0.0.1 --port 5173
+- Run launcher from project root:
+- powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1
+- Or run frontend commands from .\frontend folder
 
 Issue: 401 Missing authorization token
 
@@ -216,7 +212,7 @@ Issue: CSV dataset not found
 
 Fix:
 
-- Ensure both Spotify CSV files are in D:\MusicGrowth.ai
+- Ensure both Spotify CSV files are in project root
 - Or set SPOTIFY_DATASET_APRIL and SPOTIFY_DATASET_NOV
 
 Issue: history count seems stuck at 20
@@ -229,10 +225,9 @@ Fix:
 ## 12. Exact Startup Order (Recommended Every Time)
 
 1. Start MongoDB
-2. Start backend on port 8001
-3. Start frontend on port 5173
-4. Open website
-5. Register or Login
-6. Upload and analyze song
+2. Run powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1
+3. Open website
+4. Register or Login
+5. Upload and analyze song
 
 That is the full production-like local run flow for this project.

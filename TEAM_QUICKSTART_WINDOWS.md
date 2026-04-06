@@ -8,27 +8,9 @@ Use this when you want the project running fast with minimum confusion.
 2. Install Node.js 18+
 3. Install MongoDB Community Server
 
-## B. Open 2 Terminals
+## B. Start MongoDB
 
-- Terminal 1 for backend
-- Terminal 2 for frontend
-
-## C. Preflight Check (Optional but Recommended)
-
-From project root:
-
-- powershell -ExecutionPolicy Bypass -File .\scripts\preflight.ps1
-
-You should see PASS lines for:
-
-- Python
-- Node
-- npm
-- Spotify CSV files
-
-## D. Start MongoDB
-
-If installed as service, ensure it is running.
+If installed as a service, ensure it is running.
 
 Quick check:
 
@@ -36,34 +18,40 @@ Quick check:
 
 If it opens, MongoDB is running.
 
-## E. Start Backend (Terminal 1)
+## C. Single Source Of Truth Launcher
 
-From project root:
+From project root, run:
 
-- cd backend
-- ..\.venv\Scripts\activate
-- python -m pip install -r requirements.txt
-- python -m uvicorn app.main:app --app-dir D:/MusicGrowth.ai/backend --host 127.0.0.1 --port 8001 --reload
+- powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1
 
-Expected health:
+What this launcher does:
 
-- Open new terminal and run:
-- Invoke-RestMethod http://127.0.0.1:8001/api/health
-- Expected result: {"status":"ok"}
+- Runs preflight checks
+- Installs backend dependencies (pip)
+- Installs frontend dependencies (npm)
+- Starts backend on 127.0.0.1:8001 in a new terminal
+- Starts frontend on 127.0.0.1:5173 in a new terminal
+- Opens the app in your browser
 
-## F. Start Frontend (Terminal 2)
-
-From project root:
-
-- cd frontend
-- npm install
-- npm run dev -- --host 127.0.0.1 --port 5173
-
-Open:
+Open app:
 
 - http://127.0.0.1:5173
 
-## G. First Functional Test (UI)
+## D. Useful Launcher Flags
+
+- Skip dependency installs:
+- powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1 -SkipInstall
+
+- Skip preflight:
+- powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1 -SkipPreflight
+
+- Dry run (show commands only):
+- powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1 -DryRun
+
+- Do not auto-open browser:
+- powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1 -NoBrowser
+
+## E. First Functional Test (UI)
 
 1. Register a new account
 2. Login
@@ -76,7 +64,7 @@ Open:
 - Difference Intelligence
 - Saved Analyses
 
-## H. Supported Audio Formats
+## F. Supported Audio Formats
 
 - .mp3
 - .wav
@@ -84,24 +72,23 @@ Open:
 - .m4a
 - .ogg
 
-## I. Team Rules To Avoid Runtime Issues
+## G. Team Rules To Avoid Runtime Issues
 
-1. Always run backend before frontend
-2. Do not use port 8000 or 5173 for other apps
+1. Always start MongoDB before launcher
+2. Do not use port 8001 or 5173 for other apps
 3. Keep both Spotify CSV files in project root:
 
-- D:\MusicGrowth.ai\SpotifyAudioFeaturesApril2019.csv
-- D:\MusicGrowth.ai\SpotifyAudioFeaturesNov2018.csv
+- .\SpotifyAudioFeaturesApril2019.csv
+- .\SpotifyAudioFeaturesNov2018.csv
 
 4. Use same Python version across team if possible
 
-## J. Common Fixes
+## H. Common Fixes
 
 Issue: frontend says package.json missing
 
-- Run frontend commands from frontend folder
-- Or use:
-- npm --prefix D:\MusicGrowth.ai\frontend run dev -- --host 127.0.0.1 --port 5173
+- Run launcher from project root
+- Or run frontend command from frontend folder directly
 
 Issue: 401 Missing authorization token
 
@@ -114,14 +101,12 @@ Issue: MongoDB connection fails
 
 Issue: no similar songs or weird matches
 
-- Verify both Spotify CSV datasets exist in root
+- Verify both Spotify CSV datasets exist in project root
 - Ensure files are not corrupted
 
-## K. Demo-Day Startup Order (Mandatory)
+## I. Demo-Day Startup Order (Mandatory)
 
 1. Start MongoDB
-2. Start backend
-3. Verify /api/health
-4. Start frontend
-5. Open website and login
-6. Run one sample upload before presentation
+2. Run launcher
+3. Verify http://127.0.0.1:8001/api/health
+4. Login and run one sample upload
