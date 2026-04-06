@@ -230,4 +230,42 @@ Fix:
 4. Register or Login
 5. Upload and analyze song
 
+## 13. Debug Helpers (Copy-Paste)
+
+Run from project root.
+
+Set shared variables once in PowerShell:
+
+```powershell
+$env:DEBUG_USER_ID="<USER_OBJECT_ID>"
+$env:MONGO_URI="mongodb://127.0.0.1:27017"
+$env:MONGO_DB_NAME="musicgrowth"
+```
+
+Check non-finite values in saved analyses:
+
+```powershell
+& .\.venv\Scripts\python.exe .\_debug_nonfinite.py --user-id $env:DEBUG_USER_ID --mongo-uri $env:MONGO_URI --db-name $env:MONGO_DB_NAME --limit 200
+```
+
+Validate history documents against backend schemas:
+
+```powershell
+& .\.venv\Scripts\python.exe .\_debug_history_validation.py --user-id $env:DEBUG_USER_ID --mongo-uri $env:MONGO_URI --db-name $env:MONGO_DB_NAME --limit 200
+```
+
+Verify popularity filtering behavior on dataset rows:
+
+```powershell
+& .\.venv\Scripts\python.exe .\backend\scripts\verify_popularity.py --min-popularity 35 --max-rows 50000
+```
+
+Quick help for available script flags:
+
+```powershell
+& .\.venv\Scripts\python.exe .\_debug_nonfinite.py --help
+& .\.venv\Scripts\python.exe .\_debug_history_validation.py --help
+& .\.venv\Scripts\python.exe .\backend\scripts\verify_popularity.py --help
+```
+
 That is the full production-like local run flow for this project.

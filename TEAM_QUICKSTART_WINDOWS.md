@@ -110,3 +110,25 @@ Issue: no similar songs or weird matches
 2. Run launcher
 3. Verify http://127.0.0.1:8001/api/health
 4. Login and run one sample upload
+
+## J. Debug Helpers (Copy-Paste)
+
+Run from project root.
+
+```powershell
+$env:DEBUG_USER_ID="<USER_OBJECT_ID>"
+$env:MONGO_URI="mongodb://127.0.0.1:27017"
+$env:MONGO_DB_NAME="musicgrowth"
+
+& .\.venv\Scripts\python.exe .\_debug_nonfinite.py --user-id $env:DEBUG_USER_ID --mongo-uri $env:MONGO_URI --db-name $env:MONGO_DB_NAME --limit 200
+& .\.venv\Scripts\python.exe .\_debug_history_validation.py --user-id $env:DEBUG_USER_ID --mongo-uri $env:MONGO_URI --db-name $env:MONGO_DB_NAME --limit 200
+& .\.venv\Scripts\python.exe .\backend\scripts\verify_popularity.py --min-popularity 35 --max-rows 50000
+```
+
+Script help:
+
+```powershell
+& .\.venv\Scripts\python.exe .\_debug_nonfinite.py --help
+& .\.venv\Scripts\python.exe .\_debug_history_validation.py --help
+& .\.venv\Scripts\python.exe .\backend\scripts\verify_popularity.py --help
+```
