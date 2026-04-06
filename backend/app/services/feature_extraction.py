@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import Any
+
+# Avoid environment-specific numba JIT DLL restrictions on locked-down Windows setups.
+os.environ.setdefault("NUMBA_DISABLE_JIT", "1")
+os.environ.setdefault("NUMBA_DISABLE_CUDA", "1")
 
 import librosa
 import numpy as np
+from scipy.signal import find_peaks
 
 
 MIN_VALID_AUDIO_RMS = 1e-4
@@ -78,25 +84,64 @@ def select_best_segment(y: np.ndarray, sr: int, segment_seconds: int = 30) -> np
     return y[best_start : best_start + segment_len]
 
 
+def _estimate_tempo_and_beat_density(onset: np.ndarray, sr: int, hop_length: int, duration_seconds: float) -> tuple[float, float]:
+    """
+    Estimate tempo/beat density without relying on librosa.beat.beat_track.
+
+    This avoids numba-heavy internals that can fail under strict Windows
+    application control policies.
+    """
+    min_peak_distance = max(1, int((60.0 / 220.0) * sr / hop_length))
+    onset_height = float(np.mean(onset)) if onset.size else 0.0
+    peaks, _ = find_peaks(onset, distance=min_peak_distance, height=onset_height)
+
+    beat_density = float(len(peaks)) / max(duration_seconds, 1.0)
+    tempo = 120.0
+
+    if len(peaks) >= 2:
+        peak_times = librosa.frames_to_time(peaks, sr=sr, hop_length=hop_length)
+        intervals = np.diff(peak_times)
+        valid_intervals = intervals[(intervals > 0.2) & (intervals < 2.0)]
+        if len(valid_intervals) > 0:
+            tempo = float(60.0 / np.median(valid_intervals))
+    else:
+        try:
+            tempo_candidates = librosa.feature.tempo(onset_envelope=onset, sr=sr, hop_length=hop_length)
+            tempo = float(np.atleast_1d(tempo_candidates).item())
+        except Exception:
+            tempo = 120.0
+
+    return max(1.0, tempo), beat_density
+
+
+def _zero_crossing_rate_numpy(y: np.ndarray) -> float:
+    """Compute global zero-crossing rate without numba-dependent librosa helpers."""
+    if y.size < 2:
+        return 0.0
+
+    signs = np.signbit(y)
+    crossings = np.not_equal(signs[1:], signs[:-1])
+    return float(np.mean(crossings))
+
+
 def extract_raw_features(y: np.ndarray, sr: int) -> RawFeatures:
-    tempo_arr, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
-    tempo = max(1.0, float(np.atleast_1d(tempo_arr).item()))
+    hop_length = 512
+    duration_seconds = max(float(len(y)) / float(sr), 1.0)
 
     rms = librosa.feature.rms(y=y)[0]
-    zcr = librosa.feature.zero_crossing_rate(y)[0]
+    zcr = _zero_crossing_rate_numpy(y)
     centroid = librosa.feature.spectral_centroid(y=y, sr=sr)[0]
     bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr)[0]
-    chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+    # Force fixed tuning to avoid pitch-stencil internals that require compiled numba.
+    chroma = librosa.feature.chroma_stft(y=y, sr=sr, tuning=0.0)
     mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
     onset = librosa.onset.onset_strength(y=y, sr=sr)
-    tempogram = librosa.feature.tempogram(onset_envelope=onset, sr=sr)
+    tempogram = librosa.feature.tempogram(onset_envelope=onset, sr=sr, hop_length=hop_length)
+    tempo, beat_density = _estimate_tempo_and_beat_density(onset, sr, hop_length, duration_seconds)
 
     harmonic, percussive = librosa.effects.hpss(y)
     harmonic_energy = float(np.mean(np.abs(harmonic)) + 1e-9)
     percussive_energy = float(np.mean(np.abs(percussive)) + 1e-9)
-
-    duration_seconds = max(float(len(y)) / float(sr), 1.0)
-    beat_density = float(len(beat_frames)) / duration_seconds
 
     # Higher values mean a clearer dominant pulse across frames.
     tempo_peak = np.max(tempogram, axis=0)
@@ -107,7 +152,7 @@ def extract_raw_features(y: np.ndarray, sr: int) -> RawFeatures:
     return RawFeatures(
         tempo=tempo,
         rms=float(np.mean(rms)),
-        zcr=float(np.mean(zcr)),
+        zcr=zcr,
         spectral_centroid=float(np.mean(centroid)),
         spectral_bandwidth=float(np.mean(bandwidth)),
         loudness_db=float(librosa.amplitude_to_db(np.array([float(np.mean(rms)) + 1e-9]), ref=1.0)[0]),

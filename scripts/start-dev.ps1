@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$BindHost = "127.0.0.1",
-    [int]$BackendPort = 8001,
+    [int]$BackendPort = 8000,
     [int]$FrontendPort = 5173,
     [switch]$SkipPreflight,
     [switch]$SkipInstall,

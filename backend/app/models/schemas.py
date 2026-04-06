@@ -51,6 +51,7 @@ class StyleClusterPrediction(BaseModel):
     cluster_id: int
     label: str
     confidence: float
+    raw_confidence: float | None = None
 
 
 class AnalysisResponse(BaseModel):

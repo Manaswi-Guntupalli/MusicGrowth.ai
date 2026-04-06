@@ -81,6 +81,10 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
     )
   }
 
+  const clusterConfidence = Number(result.style_cluster?.confidence ?? 0)
+  const clusterRawConfidence = Number(result.style_cluster?.raw_confidence ?? clusterConfidence)
+  const hasRawClusterConfidence = Number.isFinite(Number(result.style_cluster?.raw_confidence))
+
   const baseFeatures = FEATURE_ORDER.reduce((acc, name) => {
     acc[name] = Number(result.sound_dna?.[name] ?? 0)
     return acc
@@ -215,7 +219,10 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
       const generatedAt = new Date().toLocaleString()
       writeKV('Generated', generatedAt)
       writeKV('Cluster', result.style_cluster.label)
-      writeKV('Cluster confidence', `${Number(result.style_cluster.confidence || 0).toFixed(1)}%`)
+      writeKV('Cluster confidence', `${clusterConfidence.toFixed(1)}%`)
+      if (hasRawClusterConfidence) {
+        writeKV('Raw cluster confidence', `${clusterRawConfidence.toFixed(1)}%`)
+      }
       writeKV('Mood / Production', `${result.sound_dna.mood} / ${result.sound_dna.production_style}`)
 
       writeSectionTitle('Sound DNA Snapshot')
@@ -607,9 +614,12 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         <div className="cluster-badge">
           <h2>{result.style_cluster.label}</h2>
           <div className="confidence-bar">
-            <div className="confidence-fill" style={{ width: `${result.style_cluster.confidence}%` }}></div>
+            <div className="confidence-fill" style={{ width: `${clusterConfidence}%` }}></div>
           </div>
-          <p>{result.style_cluster.confidence.toFixed(1)}% Confidence</p>
+          <p>
+            {clusterConfidence.toFixed(1)}% Calibrated Confidence
+            {hasRawClusterConfidence ? ` (Raw ${clusterRawConfidence.toFixed(1)}%)` : ''}
+          </p>
         </div>
       </section>
 

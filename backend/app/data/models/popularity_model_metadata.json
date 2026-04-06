@@ -1,0 +1,22 @@
+{
+  "model": "hist_gradient_boosting",
+  "mae": 10.094119,
+  "r2": 0.318366,
+  "feature_order": [
+    "tempo",
+    "energy",
+    "danceability",
+    "valence",
+    "acousticness",
+    "instrumentalness",
+    "liveness",
+    "speechiness",
+    "loudness",
+    "mfcc_mean_1",
+    "mfcc_mean_2",
+    "mfcc_mean_3",
+    "mfcc_mean_4",
+    "mfcc_mean_5"
+  ],
+  "split_strategy": "group_shuffle_fallback"
+}

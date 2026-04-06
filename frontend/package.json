@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "smoke:analysis-contract": "node scripts/analysis_contract_smoke.mjs"
   },
   "dependencies": {
     "chart.js": "^4.4.0",

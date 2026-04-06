@@ -12,6 +12,8 @@ from sklearn.preprocessing import StandardScaler
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+from app.core import config as _config  # noqa: F401
+
 from app.services.similarity import _build_reference_from_row, _dataset_paths
 from app.services.sound_dna import vectorize
 

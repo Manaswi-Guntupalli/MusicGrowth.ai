@@ -1,0 +1,231 @@
+{
+  "dataset": {
+    "rows": 50000,
+    "unique_track_ids": 50000,
+    "feature_missing_rows": 0,
+    "invalid_feature_rows": 0
+  },
+  "recency": {
+    "datasets": [
+      {
+        "path": "C:\\Users\\LENOVO\\Downloads\\MusicGrowth.AI\\MusicGrowth.ai\\SpotifyAudioFeaturesApril2019.csv",
+        "exists": true,
+        "modified_utc": "2026-04-06T17:44:32.101315+00:00"
+      },
+      {
+        "path": "C:\\Users\\LENOVO\\Downloads\\MusicGrowth.AI\\MusicGrowth.ai\\SpotifyAudioFeaturesNov2018.csv",
+        "exists": true,
+        "modified_utc": "2026-04-06T17:44:32.242675+00:00"
+      }
+    ],
+    "note": "Add newer Spotify snapshots via SPOTIFY_DATASET_APRIL/SPOTIFY_DATASET_NOV or SPOTIFY_DATASET_EXTRA workflow."
+  },
+  "popularity": {
+    "count": 50000,
+    "min": 30.0,
+    "max": 100.0,
+    "mean": 45.3384,
+    "p10": 31.0,
+    "p50": 43.0,
+    "p90": 63.0
+  },
+  "outliers": {
+    "tempo": {
+      "q1": 97.93,
+      "q3": 140.044998,
+      "iqr": 42.114998,
+      "lower_bound": 34.757504,
+      "upper_bound": 203.217495,
+      "outlier_count": 144,
+      "outlier_ratio": 0.00288
+    },
+    "energy": {
+      "q1": 0.466,
+      "q3": 0.79,
+      "iqr": 0.324,
+      "lower_bound": -0.02,
+      "upper_bound": 1.276,
+      "outlier_count": 0,
+      "outlier_ratio": 0.0
+    },
+    "danceability": {
+      "q1": 0.505,
+      "q3": 0.742,
+      "iqr": 0.237,
+      "lower_bound": 0.1495,
+      "upper_bound": 1.0975,
+      "outlier_count": 380,
+      "outlier_ratio": 0.0076
+    },
+    "valence": {
+      "q1": 0.253,
+      "q3": 0.631,
+      "iqr": 0.378,
+      "lower_bound": -0.314,
+      "upper_bound": 1.198,
+      "outlier_count": 0,
+      "outlier_ratio": 0.0
+    },
+    "acousticness": {
+      "q1": 0.031075,
+      "q3": 0.49425,
+      "iqr": 0.463175,
+      "lower_bound": -0.663688,
+      "upper_bound": 1.189013,
+      "outlier_count": 0,
+      "outlier_ratio": 0.0
+    },
+    "instrumentalness": {
+      "q1": 0.0,
+      "q3": 0.016,
+      "iqr": 0.016,
+      "lower_bound": -0.024,
+      "upper_bound": 0.04,
+      "outlier_count": 11240,
+      "outlier_ratio": 0.2248
+    },
+    "liveness": {
+      "q1": 0.0973,
+      "q3": 0.223,
+      "iqr": 0.1257,
+      "lower_bound": -0.09125,
+      "upper_bound": 0.41155,
+      "outlier_count": 3698,
+      "outlier_ratio": 0.07396
+    },
+    "speechiness": {
+      "q1": 0.039,
+      "q3": 0.135,
+      "iqr": 0.096,
+      "lower_bound": -0.105,
+      "upper_bound": 0.279,
+      "outlier_count": 5266,
+      "outlier_ratio": 0.10532
+    },
+    "loudness": {
+      "q1": -9.466499,
+      "q3": -5.09975,
+      "iqr": 4.366749,
+      "lower_bound": -16.016623,
+      "upper_bound": 1.450374,
+      "outlier_count": 2886,
+      "outlier_ratio": 0.05772
+    },
+    "mfcc_mean_1": {
+      "q1": -24.281549,
+      "q3": -18.830383,
+      "iqr": 5.451166,
+      "lower_bound": -32.458299,
+      "upper_bound": -10.653634,
+      "outlier_count": 2726,
+      "outlier_ratio": 0.05452
+    },
+    "mfcc_mean_2": {
+      "q1": -77.918625,
+      "q3": -4.019142,
+      "iqr": 73.899483,
+      "lower_bound": -188.76785,
+      "upper_bound": 106.830083,
+      "outlier_count": 1753,
+      "outlier_ratio": 0.03506
+    },
+    "mfcc_mean_3": {
+      "q1": -12.0365,
+      "q3": 27.22625,
+      "iqr": 39.26275,
+      "lower_bound": -70.930624,
+      "upper_bound": 86.120374,
+      "outlier_count": 10,
+      "outlier_ratio": 0.0002
+    },
+    "mfcc_mean_4": {
+      "q1": 10.133875,
+      "q3": 24.700001,
+      "iqr": 14.566126,
+      "lower_bound": -11.715314,
+      "upper_bound": 46.54919,
+      "outlier_count": 2686,
+      "outlier_ratio": 0.05372
+    },
+    "mfcc_mean_5": {
+      "q1": -37.546268,
+      "q3": -19.285,
+      "iqr": 18.261269,
+      "lower_bound": -64.938171,
+      "upper_bound": 8.106903,
+      "outlier_count": 7530,
+      "outlier_ratio": 0.1506
+    }
+  },
+  "current_model": {
+    "cluster_count": 7,
+    "cluster_sizes": {
+      "0": 7701,
+      "1": 12901,
+      "2": 6759,
+      "3": 2949,
+      "4": 2355,
+      "5": 13116,
+      "6": 4219
+    },
+    "cluster_balance": {
+      "min_cluster_size": 2355,
+      "max_cluster_size": 13116,
+      "min_to_max_ratio": 0.179552,
+      "largest_cluster_share": 0.26232
+    },
+    "confidence": {
+      "raw": {
+        "mean": 56.696,
+        "median": 52.369,
+        "p90": 91.799,
+        "max": 100.0
+      },
+      "calibrated": {
+        "mean": 83.581,
+        "median": 88.808,
+        "p90": 94.1,
+        "p95": 94.749,
+        "max": 97.198
+      },
+      "calibration_bins_loaded": true
+    }
+  },
+  "k_sweep": [
+    {
+      "k": 6,
+      "silhouette": 0.19466,
+      "davies_bouldin": 1.43758,
+      "calinski_harabasz": 269.035,
+      "size_balance": 0.19608
+    },
+    {
+      "k": 7,
+      "silhouette": 0.1885,
+      "davies_bouldin": 1.43276,
+      "calinski_harabasz": 254.494,
+      "size_balance": 0.23729
+    },
+    {
+      "k": 8,
+      "silhouette": 0.18371,
+      "davies_bouldin": 1.38589,
+      "calinski_harabasz": 241.078,
+      "size_balance": 0.23755
+    },
+    {
+      "k": 9,
+      "silhouette": 0.18356,
+      "davies_bouldin": 1.4467,
+      "calinski_harabasz": 226.529,
+      "size_balance": 0.14583
+    },
+    {
+      "k": 10,
+      "silhouette": 0.17907,
+      "davies_bouldin": 1.45556,
+      "calinski_harabasz": 215.945,
+      "size_balance": 0.09565
+    }
+  ]
+}

@@ -81,7 +81,7 @@ What this does:
 - Runs preflight checks
 - Installs backend dependencies
 - Installs frontend dependencies
-- Starts backend on 127.0.0.1:8001
+- Starts backend on 127.0.0.1:8000
 - Starts frontend on 127.0.0.1:5173
 - Opens browser to the app
 
@@ -104,7 +104,7 @@ Terminal 1 (backend):
 - cd .\backend
 - ..\.venv\Scripts\activate
 - python -m pip install -r requirements.txt
-- python -m uvicorn app.main:app --app-dir . --host 127.0.0.1 --port 8001 --reload
+- python -m uvicorn app.main:app --app-dir . --host 127.0.0.1 --port 8000 --reload
 
 Terminal 2 (frontend):
 
@@ -114,7 +114,7 @@ Terminal 2 (frontend):
 
 Health check:
 
-- Invoke-RestMethod http://127.0.0.1:8001/api/health
+ - Invoke-RestMethod http://127.0.0.1:8000/api/health
 
 ## 6. Full App Flow (What You Should See)
 
@@ -196,18 +196,18 @@ PowerShell example:
 
 Register:
 
-- Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8001/api/auth/register -ContentType application/json -Body '{"name":"Test","email":"test1@musicgrowth.ai","password":"demo1234"}'
+- Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/auth/register -ContentType application/json -Body '{"name":"Test","email":"test1@musicgrowth.ai","password":"demo1234"}'
 
 Analyze with token:
 
 1. Save token from register response as TOKEN
 2. Run:
 
-- curl.exe -X POST "http://127.0.0.1:8001/api/analyze?segment_mode=best" -H "Authorization: Bearer TOKEN" -F "file=@./dark_horse_remix.mp3"
+- curl.exe -X POST "http://127.0.0.1:8000/api/analyze?segment_mode=best" -H "Authorization: Bearer TOKEN" -F "file=@./dark_horse_remix.mp3"
 
 Get saved analyses:
 
-- Invoke-RestMethod -Method Get -Uri http://127.0.0.1:8001/api/analyses -Headers @{ Authorization = "Bearer TOKEN" }
+- Invoke-RestMethod -Method Get -Uri http://127.0.0.1:8000/api/analyses -Headers @{ Authorization = "Bearer TOKEN" }
 
 ## 11. Common Issues and Fixes
 

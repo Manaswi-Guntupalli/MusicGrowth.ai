@@ -1,0 +1,47 @@
+{
+  "dataset_rows": 5000,
+  "feature_count": 14,
+  "split_strategy": "group_shuffle_fallback",
+  "models_tested": [
+    "hist_gradient_boosting",
+    "extra_trees",
+    "random_forest",
+    "mean_baseline"
+  ],
+  "leaderboard": [
+    {
+      "model": "hist_gradient_boosting",
+      "mae": 10.094119,
+      "r2": 0.318366,
+      "train_rows": 4151,
+      "test_rows": 849
+    },
+    {
+      "model": "extra_trees",
+      "mae": 10.128873,
+      "r2": 0.321561,
+      "train_rows": 4151,
+      "test_rows": 849
+    },
+    {
+      "model": "random_forest",
+      "mae": 10.214158,
+      "r2": 0.30009,
+      "train_rows": 4151,
+      "test_rows": 849
+    },
+    {
+      "model": "mean_baseline",
+      "mae": 14.336702,
+      "r2": -0.0604,
+      "train_rows": 4151,
+      "test_rows": 849
+    }
+  ],
+  "best_model": {
+    "model": "hist_gradient_boosting",
+    "mae": 10.094119,
+    "r2": 0.318366,
+    "path": "C:\\Users\\LENOVO\\Downloads\\MusicGrowth.AI\\MusicGrowth.ai\\backend\\app\\data\\models\\popularity_model.pkl"
+  }
+}

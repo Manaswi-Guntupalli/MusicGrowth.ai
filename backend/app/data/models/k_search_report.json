@@ -1,0 +1,103 @@
+{
+  "selection_mode": "auto",
+  "selected_k": 7,
+  "constraints": {
+    "interp_min_balance": 0.18,
+    "interp_max_largest_share": 0.32,
+    "k_search_min": 6,
+    "k_search_max": 14,
+    "k_search_sample_size": 8000
+  },
+  "candidates": [
+    {
+      "k": 7,
+      "silhouette": 0.193483,
+      "davies_bouldin": 1.401553,
+      "calinski_harabasz": 1661.65674,
+      "size_balance": 0.192891,
+      "largest_share": 0.26375,
+      "interpretable": true,
+      "score": 0.903137
+    },
+    {
+      "k": 6,
+      "silhouette": 0.193135,
+      "davies_bouldin": 1.443901,
+      "calinski_harabasz": 1777.134783,
+      "size_balance": 0.188496,
+      "largest_share": 0.2825,
+      "interpretable": true,
+      "score": 0.876419
+    },
+    {
+      "k": 8,
+      "silhouette": 0.169496,
+      "davies_bouldin": 1.455493,
+      "calinski_harabasz": 1546.763581,
+      "size_balance": 0.192899,
+      "largest_share": 0.235875,
+      "interpretable": true,
+      "score": 0.591932
+    },
+    {
+      "k": 9,
+      "silhouette": 0.171431,
+      "davies_bouldin": 1.497344,
+      "calinski_harabasz": 1461.771082,
+      "size_balance": 0.148553,
+      "largest_share": 0.228875,
+      "interpretable": false,
+      "score": 0.289102
+    },
+    {
+      "k": 10,
+      "silhouette": 0.16796,
+      "davies_bouldin": 1.497893,
+      "calinski_harabasz": 1395.467648,
+      "size_balance": 0.159091,
+      "largest_share": 0.2035,
+      "interpretable": false,
+      "score": 0.258435
+    },
+    {
+      "k": 13,
+      "silhouette": 0.157238,
+      "davies_bouldin": 1.604676,
+      "calinski_harabasz": 1206.777725,
+      "size_balance": 0.185749,
+      "largest_share": 0.156125,
+      "interpretable": true,
+      "score": 0.177527
+    },
+    {
+      "k": 14,
+      "silhouette": 0.14727,
+      "davies_bouldin": 1.601703,
+      "calinski_harabasz": 1159.530022,
+      "size_balance": 0.222015,
+      "largest_share": 0.134,
+      "interpretable": true,
+      "score": 0.153659
+    },
+    {
+      "k": 11,
+      "silhouette": 0.164742,
+      "davies_bouldin": 1.603071,
+      "calinski_harabasz": 1324.506568,
+      "size_balance": 0.172897,
+      "largest_share": 0.18725,
+      "interpretable": false,
+      "score": 0.106338
+    },
+    {
+      "k": 12,
+      "silhouette": 0.166569,
+      "davies_bouldin": 1.584223,
+      "calinski_harabasz": 1261.373556,
+      "size_balance": 0.155878,
+      "largest_share": 0.18925,
+      "interpretable": false,
+      "score": 0.090153
+    }
+  ]
+}

@@ -49,7 +49,7 @@ What this launcher does:
 - Runs preflight checks
 - Installs backend dependencies (pip)
 - Installs frontend dependencies (npm)
-- Starts backend on 127.0.0.1:8001 in a new terminal
+- Starts backend on 127.0.0.1:8000 in a new terminal
 - Starts frontend on 127.0.0.1:5173 in a new terminal
 - Opens the app in your browser
 
@@ -95,7 +95,7 @@ Open app:
 ## G. Team Rules To Avoid Runtime Issues
 
 1. Always start MongoDB before launcher
-2. Do not use port 8001 or 5173 for other apps
+2. Do not use port 8000 or 5173 for other apps
 3. Keep both Spotify CSV files in project root:
 
 - .\SpotifyAudioFeaturesApril2019.csv
@@ -139,7 +139,7 @@ Issue: upload fails with file too large
 
 1. Start MongoDB
 2. Run launcher
-3. Verify http://127.0.0.1:8001/api/health
+3. Verify http://127.0.0.1:8000/api/health
 4. Login and run one sample upload
 
 ## J. Debug Helpers (Copy-Paste)
@@ -163,3 +163,19 @@ Script help:
 & .\.venv\Scripts\python.exe .\_debug_history_validation.py --help
 & .\.venv\Scripts\python.exe .\backend\scripts\verify_popularity.py --help
 ```
+
+## K. One-Command Regression Guardrails
+
+From project root:
+
+- powershell -ExecutionPolicy Bypass -File .\scripts\verify-core.ps1
+
+This command runs:
+
+- Startup launcher dry-run smoke
+- Backend pytest suite (auth, analyze, history, schema, health)
+- Frontend analysis API-contract smoke
+
+Optional strict live-health check (requires backend running):
+
+- powershell -ExecutionPolicy Bypass -File .\scripts\verify-core.ps1 -RequireLiveHealth

@@ -10,6 +10,7 @@ import joblib
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 from sklearn.preprocessing import StandardScaler
 
@@ -22,12 +23,32 @@ SCALER_PATH = MODEL_DIR / "scaler.pkl"
 KMEANS_PATH = MODEL_DIR / "kmeans.pkl"
 CLUSTER_LABELS_PATH = MODEL_DIR / "cluster_labels.json"
 MARKET_PROFILE_PATH = MODEL_DIR / "market_profile.json"
+CONFIDENCE_CALIBRATION_PATH = MODEL_DIR / "confidence_calibration.json"
+K_SEARCH_REPORT_PATH = MODEL_DIR / "k_search_report.json"
 
 
 def _softmax(x: np.ndarray) -> np.ndarray:
     shifted = x - np.max(x)
     exp = np.exp(shifted)
     return exp / (np.sum(exp) + 1e-9)
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def _distance_membership(distances: np.ndarray) -> tuple[np.ndarray, float]:
+    """
+    Convert centroid distances into probability-like memberships.
+
+    Uses MAD-based temperature so confidence stays stable across dense/sparse
+    regions and avoids over-flattening from per-sample std spikes.
+    """
+    median = float(np.median(distances))
+    mad = float(np.median(np.abs(distances - median))) * 1.4826
+    temperature = max(mad, 0.18)
+    membership = _softmax(-distances / temperature)
+    return membership, temperature
 
 
 def _build_reference_from_row(row: dict) -> dict | None:
@@ -53,8 +74,11 @@ def _build_reference_from_row(row: dict) -> dict | None:
 
 def _dataset_paths() -> list[Path]:
     workspace_root = Path(__file__).resolve().parents[3]
-    april = Path(os.getenv("SPOTIFY_DATASET_APRIL", workspace_root / "SpotifyAudioFeaturesApril2019.csv"))
-    nov = Path(os.getenv("SPOTIFY_DATASET_NOV", workspace_root / "SpotifyAudioFeaturesNov2018.csv"))
+    april_override = (os.getenv("SPOTIFY_DATASET_APRIL") or "").strip()
+    nov_override = (os.getenv("SPOTIFY_DATASET_NOV") or "").strip()
+
+    april = Path(april_override) if april_override else workspace_root / "SpotifyAudioFeaturesApril2019.csv"
+    nov = Path(nov_override) if nov_override else workspace_root / "SpotifyAudioFeaturesNov2018.csv"
     return [april, nov]
 
 
@@ -75,6 +99,170 @@ def _compute_market_profile(refs: list[dict], cluster_count: int) -> dict[str, d
             "opportunity_score": round(opportunity, 6),
         }
     return profile
+
+
+def _compute_cluster_distance_stats(
+    matrix_scaled: np.ndarray,
+    kmeans: KMeans,
+    cluster_to_indices: dict[int, list[int]],
+) -> dict[int, dict[str, float]]:
+    """
+    Summarize distance distribution of each cluster for confidence calibration.
+    """
+    stats: dict[int, dict[str, float]] = {}
+    centers = kmeans.cluster_centers_
+
+    for cluster_id, indices in cluster_to_indices.items():
+        if not indices:
+            stats[int(cluster_id)] = {"p50": 0.0, "p90": 0.0}
+            continue
+
+        rows = matrix_scaled[np.array(indices, dtype=np.int32)]
+        distances = np.linalg.norm(rows - centers[int(cluster_id)], axis=1)
+        stats[int(cluster_id)] = {
+            "p50": float(np.percentile(distances, 50)),
+            "p90": float(np.percentile(distances, 90)),
+        }
+
+    return stats
+
+
+def _compute_raw_margin_signals(matrix_scaled: np.ndarray, kmeans: KMeans) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Compute per-sample cluster labels, raw membership confidence, and margin signal.
+    """
+    centers = kmeans.cluster_centers_
+    labels = kmeans.predict(matrix_scaled).astype(np.int32)
+
+    raw_confidence = np.zeros(len(matrix_scaled), dtype=np.float32)
+    margin_confidence = np.zeros(len(matrix_scaled), dtype=np.float32)
+
+    for idx, row in enumerate(matrix_scaled):
+        distances = np.linalg.norm(centers - row, axis=1)
+        membership, _ = _distance_membership(distances)
+
+        cluster_id = int(labels[idx])
+        raw_confidence[idx] = _clamp01(float(membership[cluster_id]))
+
+        sorted_distances = np.sort(distances)
+        nearest = float(sorted_distances[0])
+        second_nearest = float(sorted_distances[1]) if len(sorted_distances) > 1 else nearest
+        margin_ratio = (second_nearest - nearest) / max(second_nearest, 1e-9)
+        margin_confidence[idx] = _clamp01(margin_ratio * 1.6)
+
+    return labels, raw_confidence, margin_confidence
+
+
+def _compute_confidence_calibration_bins(
+    matrix_scaled: np.ndarray,
+    kmeans: KMeans,
+    *,
+    num_bins: int = 10,
+    sample_size: int = 12000,
+    neighbor_k: int = 25,
+) -> dict[str, object]:
+    """
+    Build reliability bins by mapping model confidence to local cluster agreement.
+    """
+    if len(matrix_scaled) == 0:
+        return {
+            "version": 1,
+            "num_bins": int(num_bins),
+            "sample_size": 0,
+            "neighbor_k": int(neighbor_k),
+            "global_agreement": 0.0,
+            "bins": [],
+        }
+
+    labels, raw_conf, margin_conf = _compute_raw_margin_signals(matrix_scaled, kmeans)
+    pre_calibration = np.clip((0.7 * raw_conf) + (0.3 * margin_conf), 0.0, 1.0)
+
+    rng = np.random.RandomState(42)
+    all_indices = np.arange(len(matrix_scaled))
+    if len(all_indices) > sample_size:
+        sampled_indices = rng.choice(all_indices, size=sample_size, replace=False)
+    else:
+        sampled_indices = all_indices
+
+    n_neighbors = min(max(3, neighbor_k + 1), len(matrix_scaled))
+    neighbors = NearestNeighbors(n_neighbors=n_neighbors, metric="euclidean")
+    neighbors.fit(matrix_scaled)
+    _, neighbor_indices = neighbors.kneighbors(matrix_scaled[sampled_indices], return_distance=True)
+
+    if n_neighbors > 1:
+        neighbor_labels = labels[neighbor_indices[:, 1:]]
+        agreement = np.mean(neighbor_labels == labels[sampled_indices, None], axis=1)
+    else:
+        agreement = np.ones(len(sampled_indices), dtype=np.float32)
+
+    scores = pre_calibration[sampled_indices]
+    edges = np.linspace(0.0, 1.0, num_bins + 1)
+
+    prior = float(np.mean(agreement)) if len(agreement) else 0.5
+    bins: list[dict[str, float | int]] = []
+    previous_calibrated = 0.0
+
+    for i in range(num_bins):
+        lower = float(edges[i])
+        upper = float(edges[i + 1])
+
+        if i < num_bins - 1:
+            mask = (scores >= lower) & (scores < upper)
+        else:
+            mask = (scores >= lower) & (scores <= upper)
+
+        count = int(np.sum(mask))
+        if count > 0:
+            empirical = float(np.mean(agreement[mask]))
+            calibrated = (empirical * count + prior * 25.0) / (count + 25.0)
+        else:
+            calibrated = previous_calibrated
+
+        calibrated = _clamp01(max(calibrated, previous_calibrated))
+        previous_calibrated = calibrated
+
+        bins.append(
+            {
+                "lower": round(lower, 6),
+                "upper": round(upper, 6),
+                "count": count,
+                "calibrated": round(float(calibrated), 6),
+            }
+        )
+
+    return {
+        "version": 1,
+        "num_bins": int(num_bins),
+        "sample_size": int(len(sampled_indices)),
+        "neighbor_k": int(max(1, n_neighbors - 1)),
+        "global_agreement": round(prior, 6),
+        "bins": bins,
+    }
+
+
+def _apply_confidence_calibration(score: float, calibration: dict[str, object] | None) -> float:
+    if not calibration:
+        return _clamp01(score)
+
+    bins = calibration.get("bins") if isinstance(calibration, dict) else None
+    if not isinstance(bins, list) or not bins:
+        return _clamp01(score)
+
+    s = _clamp01(score)
+    for entry in bins:
+        try:
+            upper = float(entry.get("upper", 1.0))
+            calibrated = float(entry.get("calibrated", s))
+        except (TypeError, ValueError, AttributeError):
+            continue
+
+        if s <= upper:
+            return _clamp01(calibrated)
+
+    try:
+        return _clamp01(float(bins[-1].get("calibrated", s)))
+    except (TypeError, ValueError, AttributeError):
+        return _clamp01(s)
 
 
 def _label_from_centroid(centroid: dict[str, float]) -> str:
@@ -268,6 +456,23 @@ def get_similarity_model() -> dict:
             ref["cluster"] = cluster_labels.get(cluster_id, f"Cluster {cluster_id}")
         cluster_to_indices.setdefault(cluster_id, []).append(idx)
 
+    cluster_distance_stats = _compute_cluster_distance_stats(matrix_scaled, kmeans, cluster_to_indices)
+
+    if CONFIDENCE_CALIBRATION_PATH.exists():
+        try:
+            with CONFIDENCE_CALIBRATION_PATH.open("r", encoding="utf-8") as f:
+                confidence_calibration = json.load(f)
+        except Exception:
+            confidence_calibration = _compute_confidence_calibration_bins(matrix_scaled, kmeans)
+    else:
+        confidence_calibration = _compute_confidence_calibration_bins(matrix_scaled, kmeans)
+
+    try:
+        with CONFIDENCE_CALIBRATION_PATH.open("w", encoding="utf-8") as f:
+            json.dump(confidence_calibration, f, indent=2)
+    except OSError:
+        pass
+
     center_spread = np.std(kmeans.cluster_centers_, axis=0)
     spread_sum = float(np.sum(center_spread) + 1e-9)
     feature_importance = {
@@ -284,6 +489,8 @@ def get_similarity_model() -> dict:
         "kmeans": kmeans,
         "cluster_labels": cluster_labels,
         "cluster_to_indices": cluster_to_indices,
+        "cluster_distance_stats": cluster_distance_stats,
+        "confidence_calibration": confidence_calibration,
         "feature_importance": feature_importance,
         "market_profile": market_profile,
     }
@@ -339,6 +546,8 @@ def predict_style_cluster(song_features: dict[str, float]) -> dict:
     scaler: StandardScaler = model["scaler"]
     kmeans: KMeans = model["kmeans"]
     cluster_labels: dict[int, str] = model["cluster_labels"]
+    cluster_distance_stats: dict[int, dict[str, float]] = model["cluster_distance_stats"]
+    confidence_calibration: dict[str, object] | None = model.get("confidence_calibration")
 
     query = vectorize(song_features).reshape(1, -1)
     query_scaled = scaler.transform(query)
@@ -346,15 +555,34 @@ def predict_style_cluster(song_features: dict[str, float]) -> dict:
 
     distances = np.linalg.norm(kmeans.cluster_centers_ - query_scaled[0], axis=1)
 
-    # Soft assignment gives probability-like membership confidence across clusters.
-    temperature = max(float(np.std(distances)), 0.35)
-    membership = _softmax(-distances / temperature)
-    confidence = float(max(0.0, min(1.0, membership[cluster_id])))
+    membership, _ = _distance_membership(distances)
+    raw_confidence = _clamp01(float(membership[cluster_id]))
+
+    sorted_distances = np.sort(distances)
+    nearest = float(sorted_distances[0])
+    if len(sorted_distances) > 1:
+        second_nearest = float(sorted_distances[1])
+        margin_ratio = (second_nearest - nearest) / max(second_nearest, 1e-9)
+    else:
+        margin_ratio = 0.0
+    margin_confidence = _clamp01(margin_ratio * 1.6)
+
+    distance_stats = cluster_distance_stats.get(cluster_id, {"p50": nearest, "p90": nearest + 1e-6})
+    p50 = max(float(distance_stats.get("p50", nearest)), 1e-6)
+    p90 = max(float(distance_stats.get("p90", p50 + 1e-6)), p50 + 1e-6)
+    spread = max(p90 - p50, 1e-6)
+    compactness = float(1.0 / (1.0 + np.exp((nearest - p50) / (spread * 1.2))))
+
+    # Use reliability bins learned from neighborhood agreement for calibrated confidence.
+    pre_calibration = _clamp01((0.7 * raw_confidence) + (0.3 * margin_confidence))
+    calibrated = _apply_confidence_calibration(pre_calibration, confidence_calibration)
+    confidence = _clamp01((0.85 * calibrated) + (0.15 * compactness))
 
     return {
         "cluster_id": cluster_id,
         "label": cluster_labels.get(cluster_id, f"Cluster {cluster_id}"),
         "confidence": round(confidence * 100.0, 2),
+        "raw_confidence": round(raw_confidence * 100.0, 2),
     }
 
 
@@ -367,8 +595,7 @@ def cluster_membership_probabilities(song_features: dict[str, float]) -> dict[in
     query_scaled = scaler.transform(query)
 
     distances = np.linalg.norm(kmeans.cluster_centers_ - query_scaled[0], axis=1)
-    temperature = max(float(np.std(distances)), 0.35)
-    membership = _softmax(-distances / temperature)
+    membership, _ = _distance_membership(distances)
 
     return {int(i): float(membership[i]) for i in range(len(membership))}
 

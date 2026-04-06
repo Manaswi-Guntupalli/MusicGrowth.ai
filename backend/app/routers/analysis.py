@@ -8,6 +8,7 @@ from tempfile import NamedTemporaryFile
 from bson import ObjectId
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import ValidationError
+import librosa
 import soundfile as sf
 
 from ..core.config import MAX_UPLOAD_SIZE_BYTES, UPLOAD_CHUNK_SIZE_BYTES
@@ -80,17 +81,30 @@ async def _write_upload_to_temp_file(file: UploadFile, suffix: str) -> tuple[str
 def _validate_uploaded_audio_file(audio_path: str) -> None:
     try:
         info = sf.info(audio_path)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=400,
-            detail="Uploaded audio could not be parsed. The file may be corrupted or unsupported.",
-        ) from exc
+        if info.frames <= 0 or info.samplerate <= 0 or info.channels <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded audio appears empty or corrupted.",
+            )
+        return
+    except HTTPException:
+        raise
+    except Exception:
+        # Some valid formats (especially mp3 on Windows) may not be readable by
+        # libsndfile. Fall back to librosa decoder for compatibility.
+        try:
+            y, sr = librosa.load(audio_path, sr=22050, mono=True, duration=5.0)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded audio could not be parsed. The file may be corrupted or unsupported.",
+            ) from exc
 
-    if info.frames <= 0 or info.samplerate <= 0 or info.channels <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Uploaded audio appears empty or corrupted.",
-        )
+        if y is None or len(y) == 0 or sr <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded audio appears empty or corrupted.",
+            )
 
 
 @router.post("/analyze", response_model=AnalysisResponse)
