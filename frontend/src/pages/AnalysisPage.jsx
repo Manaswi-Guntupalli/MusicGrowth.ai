@@ -257,8 +257,9 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         writeWrapped('No difference insights are available.')
       } else {
         for (const diff of differences) {
+          const diffTagLabel = displayDiffTag(diff.tag)
           writeKV(
-            diff.feature,
+            `${diff.feature} [${diffTagLabel}]`,
             `You ${Number(diff.song_value || 0).toFixed(3)} vs Ref ${Number(diff.reference_mean || 0).toFixed(3)} (${Number(diff.delta_percent || 0).toFixed(1)}%)`
           )
           writeWrapped(diff.interpretation || '', 9, [88, 96, 124], 4.5)
@@ -334,6 +335,17 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
     const suffix = control?.unit ? ` ${control.unit}` : ''
     const rounded = Math.abs(value) < 1 ? value.toFixed(2) : value.toFixed(1)
     return `${value >= 0 ? '+' : ''}${rounded}${suffix}`
+  }
+
+  function normalizeDiffTag(rawTag) {
+    return String(rawTag || 'NORMAL')
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, '_') || 'NORMAL'
+  }
+
+  function displayDiffTag(rawTag) {
+    return normalizeDiffTag(rawTag).replace(/_/g, ' ')
   }
 
   function formatOpportunity(value) {
@@ -681,16 +693,20 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
               </div>
             )}
             <div className="difference-details">
-              {(result.differences || []).map((diff) => (
-                <div key={diff.feature} className={`diff-card diff-${diff.tag || 'NORMAL'}`}>
-                  <div className="diff-header">
-                    <h4>{diff.feature || 'Unknown'}</h4>
-                    <span className="diff-tag">{diff.tag || 'NORMAL'}</span>
+              {(result.differences || []).map((diff, idx) => {
+                const tagKey = normalizeDiffTag(diff.tag)
+                const tagLabel = displayDiffTag(diff.tag)
+                return (
+                  <div key={`${diff.feature}-${idx}`} className={`diff-card diff-${tagKey}`}>
+                    <div className="diff-header">
+                      <h4>{diff.feature || 'Unknown'}</h4>
+                      <span className="diff-tag">{tagLabel}</span>
+                    </div>
+                    <p className="diff-values">You: {(diff.song_value || 0).toFixed(3)} | Ref: {(diff.reference_mean || 0).toFixed(3)} ({(diff.delta_percent || 0).toFixed(1)}%)</p>
+                    <p className="diff-interpretation">{diff.interpretation || 'No interpretation available'}</p>
                   </div>
-                  <p className="diff-values">You: {(diff.song_value || 0).toFixed(3)} | Ref: {(diff.reference_mean || 0).toFixed(3)} ({(diff.delta_percent || 0).toFixed(1)}%)</p>
-                  <p className="diff-interpretation">{diff.interpretation || 'No interpretation available'}</p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </section>
         )}

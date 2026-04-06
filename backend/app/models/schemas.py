@@ -31,6 +31,7 @@ class SimilarReference(BaseModel):
 
 class DifferenceInsight(BaseModel):
     feature: str
+    tag: str = "NORMAL"
     song_value: float
     reference_mean: float
     delta_percent: float

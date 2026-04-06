@@ -3,6 +3,10 @@ from __future__ import annotations
 from .interpretation import difference_interpretation
 from .sound_dna import CORE_FEATURES
 
+DIFF_TAG_KEY = "KEY_DIFFERENTIATOR"
+DIFF_TAG_OPPORTUNITY = "OPPORTUNITY"
+DIFF_TAG_NORMAL = "NORMAL"
+
 
 def build_differences(
     song: dict[str, float],
@@ -29,19 +33,20 @@ def build_differences(
         is_opportunity = abs(delta_ratio) > delta_threshold and not is_key
 
         if is_key:
-            tag = "KEY DIFFERENTIATOR"
+            tag = DIFF_TAG_KEY
         elif is_opportunity:
-            tag = "OPPORTUNITY"
+            tag = DIFF_TAG_OPPORTUNITY
         else:
-            tag = "NORMAL"
+            tag = DIFF_TAG_NORMAL
 
         diffs.append(
             {
                 "feature": name,
+                "tag": tag,
                 "song_value": round(song_val, 3),
                 "reference_mean": round(ref, 3),
                 "delta_percent": round(delta_pct, 1),
-                "interpretation": f"[{tag}] {difference_interpretation(name, delta_pct)}",
+                "interpretation": difference_interpretation(name, delta_pct),
             }
         )
 
@@ -50,6 +55,24 @@ def build_differences(
 
 
 def build_market_gaps(style_cluster: dict, market_profile: dict[str, dict[str, float]]) -> list[str]:
+    def percentile(values: list[float], q: float) -> float:
+        if not values:
+            return 0.0
+
+        ordered = sorted(values)
+        if len(ordered) == 1:
+            return ordered[0]
+
+        q_clamped = max(0.0, min(1.0, q))
+        index = (len(ordered) - 1) * q_clamped
+        lower = int(index)
+        upper = min(lower + 1, len(ordered) - 1)
+        if lower == upper:
+            return ordered[lower]
+
+        blend = index - lower
+        return ordered[lower] + (ordered[upper] - ordered[lower]) * blend
+
     cluster_id = style_cluster.get("cluster_id")
     cluster_key = str(cluster_id)
     profile = market_profile.get(cluster_key)
@@ -61,9 +84,18 @@ def build_market_gaps(style_cluster: dict, market_profile: dict[str, dict[str, f
     saturation = float(profile.get("saturation", 1.0))
     opportunity_score = float(profile.get("opportunity_score", demand / max(1.0, saturation)))
 
-    if opportunity_score >= 2.5:
+    score_values = [float(row.get("opportunity_score", 0.0)) for row in market_profile.values()]
+    if score_values:
+        high_threshold = percentile(score_values, 0.75)
+        moderate_threshold = percentile(score_values, 0.35)
+    else:
+        # Defaults align with demand/saturation scores around 0.0x for dense clusters.
+        high_threshold = 0.03
+        moderate_threshold = 0.015
+
+    if opportunity_score >= high_threshold:
         zone = "High"
-    elif opportunity_score >= 1.0:
+    elif opportunity_score >= moderate_threshold:
         zone = "Moderate"
     else:
         zone = "Emerging"
@@ -71,7 +103,7 @@ def build_market_gaps(style_cluster: dict, market_profile: dict[str, dict[str, f
     return [
         (
             f"{zone} opportunity in {style_cluster.get('label', 'current')} cluster "
-            f"(demand={demand:.1f}, saturation={saturation:.0f}, score={opportunity_score:.2f})."
+            f"(demand={demand:.1f}, saturation={saturation:.0f}, score={opportunity_score:.5f})."
         )
     ]
 
