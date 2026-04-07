@@ -5,12 +5,13 @@ from .interpretation import mood_label, production_style
 from .normalization import normalize_features
 from .similarity import (
     feature_importance_for_song,
+    get_cluster_labels,
     get_market_profile,
     predict_style_cluster,
     reference_mean,
     top_similar,
 )
-from .strategy import build_differences, build_market_gaps, build_paths
+from .strategy import build_differences, build_market_gaps, build_market_targets, build_paths
 
 
 def run_analysis(audio_path: str, segment_mode: str = "best") -> dict:
@@ -23,6 +24,7 @@ def run_analysis(audio_path: str, segment_mode: str = "best") -> dict:
     feature_importance = feature_importance_for_song(sound_dna_features, style_cluster["cluster_id"])
     differences = build_differences(sound_dna_features, ref_avg, feature_importance)
     market_profile = get_market_profile()
+    cluster_labels = get_cluster_labels()
 
     sound_dna = {
         "tempo": round(sound_dna_features["tempo"], 2),
@@ -57,5 +59,6 @@ def run_analysis(audio_path: str, segment_mode: str = "best") -> dict:
         ],
         "differences": differences,
         "market_gaps": build_market_gaps(style_cluster, market_profile),
+        "market_targets": build_market_targets(style_cluster, market_profile, cluster_labels),
         "paths": build_paths(),
     }

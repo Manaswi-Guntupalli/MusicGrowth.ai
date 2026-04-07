@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
@@ -47,11 +49,57 @@ class StrategicPath(BaseModel):
     actions: list[str]
 
 
+class CreativePathAISummaryCard(BaseModel):
+    id: str
+    title: str
+    summary: str
+    rationale: str
+    immediate_actions: list[str]
+    caution_points: list[str]
+    success_kpis: list[str]
+
+
+class CreativePathAISummaryRequest(BaseModel):
+    sound_dna: SoundDNA
+    style_cluster: StyleClusterPrediction
+    market_gaps: list[str] = Field(default_factory=list)
+    paths: list[StrategicPath]
+    differences: list[DifferenceInsight] = Field(default_factory=list)
+
+
+class CreativePathAISummaryResponse(BaseModel):
+    source: str
+    generated_at: datetime
+    cards: list[CreativePathAISummaryCard]
+    disclaimer: str
+
+
 class StyleClusterPrediction(BaseModel):
     cluster_id: int
     label: str
     confidence: float
     raw_confidence: float | None = None
+
+
+class MarketTarget(BaseModel):
+    rank: int
+    cluster_id: int
+    label: str
+    zone: str
+    demand: float
+    saturation: float
+    opportunity_score: float
+    percentile_rank: float
+    relative_lift_vs_current_pct: float
+    move_suggestions: list[str] = Field(default_factory=list)
+
+
+class MarketTargetsPanel(BaseModel):
+    current_cluster_id: int
+    current_cluster_label: str
+    current_cluster_percentile: float
+    current_opportunity_score: float
+    targets: list[MarketTarget] = Field(default_factory=list)
 
 
 class AnalysisResponse(BaseModel):
@@ -61,6 +109,7 @@ class AnalysisResponse(BaseModel):
     top_similar: list[SimilarReference]
     differences: list[DifferenceInsight]
     market_gaps: list[str]
+    market_targets: MarketTargetsPanel | None = None
     paths: list[StrategicPath]
 
 

@@ -6,7 +6,7 @@ from .db.mongodb import init_indexes
 from .routers.analysis import router as analysis_router
 from .routers.auth import router as auth_router
 
-app = FastAPI(title="MusicGrowth Lab API", version="1.0.0")
+app = FastAPI(title="MusicGrowth.AI API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,

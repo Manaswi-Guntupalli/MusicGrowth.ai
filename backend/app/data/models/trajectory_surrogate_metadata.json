@@ -1,0 +1,9 @@
+{
+  "model": "hist_gradient_boosting_surrogate",
+  "rows": 280,
+  "feature_count": 23,
+  "base_samples": 56,
+  "variants_per_sample": 5,
+  "similarity_train_mae": 0.154874,
+  "opportunity_train_mae": 0.000118
+}

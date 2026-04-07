@@ -3,19 +3,21 @@ import UploadPage from './UploadPage'
 import AnalysisPage from './AnalysisPage'
 import HistoryPage from './HistoryPage'
 import HistoryDetailPage from './HistoryDetailPage'
-
-const API_BASE = '/api'
+import AnalysisSkeleton from '../components/AnalysisSkeleton'
+import { requestJson } from '../lib/apiClient'
 
 export default function Dashboard({ user, token, onLogout, theme, onToggleTheme }) {
   const [currentPage, setCurrentPage] = useState('upload')
   const [latestResult, setLatestResult] = useState(null)
   const [history, setHistory] = useState([])
   const [historyError, setHistoryError] = useState('')
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [analysisLoading, setAnalysisLoading] = useState(false)
   const [selectedHistoryAnalysis, setSelectedHistoryAnalysis] = useState(null)
 
   useEffect(() => {
     fetchHistory()
-  }, [])
+  }, [token])
 
   useEffect(() => {
     if (currentPage === 'history') {
@@ -26,32 +28,33 @@ export default function Dashboard({ user, token, onLogout, theme, onToggleTheme 
   async function fetchHistory() {
     try {
       setHistoryError('')
-      const res = await fetch(`${API_BASE}/analyses`, {
-        headers: { Authorization: `Bearer ${token}` },
+      setHistoryLoading(true)
+      const data = await requestJson('/analyses', {
+        token,
+        timeoutMs: 10000,
+        retries: 1,
       })
-      if (res.ok) {
-        const data = await res.json()
-        setHistory(data)
-      } else {
-        const body = await res.json().catch(() => ({}))
-        setHistoryError(body.detail || 'Failed to load history.')
-      }
+      setHistory(Array.isArray(data) ? data : [])
     } catch (err) {
-      console.error('Error fetching history:', err)
-      setHistoryError('Failed to load history. Please try again.')
+      setHistoryError(err?.message || 'Failed to load history. Please try again.')
+    } finally {
+      setHistoryLoading(false)
     }
   }
 
   function handleAnalysisComplete(analysisResult) {
-    console.log('Analysis result received:', analysisResult)
     if (!analysisResult || !analysisResult.sound_dna) {
-      console.error('Invalid analysis result structure:', analysisResult)
+      setAnalysisLoading(false)
       return
     }
     setLatestResult(analysisResult)
     setSelectedHistoryAnalysis(null)
     setCurrentPage('analysis')
     fetchHistory()
+  }
+
+  function handleAnalysisStateChange(isLoading) {
+    setAnalysisLoading(Boolean(isLoading))
   }
 
   function handleViewAnalysis(analysis) {
@@ -68,7 +71,7 @@ export default function Dashboard({ user, token, onLogout, theme, onToggleTheme 
     <div className="dashboard">
       <header className="dashboard-header">
         <div className="header-left">
-          <h1 className="logo">🎵 MusicGrowth</h1>
+          <h1 className="logo">🎵 MusicGrowth.AI</h1>
           <p className="tagline">Find your sound. Choose your path.</p>
         </div>
         <div className="header-right">
@@ -112,9 +115,19 @@ export default function Dashboard({ user, token, onLogout, theme, onToggleTheme 
 
         <main className="dashboard-content">
           {currentPage === 'upload' && (
-            <UploadPage token={token} onAnalysisComplete={handleAnalysisComplete} />
+            <>
+              <div style={{ display: analysisLoading ? 'none' : 'block' }}>
+                <UploadPage
+                  token={token}
+                  onAnalysisComplete={handleAnalysisComplete}
+                  onAnalysisStateChange={handleAnalysisStateChange}
+                />
+              </div>
+              {analysisLoading && <AnalysisSkeleton />}
+            </>
           )}
-          {currentPage === 'analysis' && latestResult && (
+          {currentPage === 'analysis' && analysisLoading && <AnalysisSkeleton />}
+          {currentPage === 'analysis' && !analysisLoading && latestResult && (
             <AnalysisPage result={latestResult} theme={theme} token={token} />
           )}
           {currentPage === 'history' && (
@@ -122,6 +135,7 @@ export default function Dashboard({ user, token, onLogout, theme, onToggleTheme 
               history={history}
               onViewAnalysis={handleViewAnalysis}
               error={historyError}
+              loading={historyLoading}
               onRetry={fetchHistory}
             />
           )}

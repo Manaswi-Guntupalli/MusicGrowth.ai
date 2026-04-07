@@ -1,4 +1,4 @@
-export default function HistoryPage({ history, onViewAnalysis, error, onRetry }) {
+export default function HistoryPage({ history, onViewAnalysis, error, onRetry, loading }) {
   return (
     <div className="page-content fade-in">
       <section className="history-header">
@@ -15,8 +15,26 @@ export default function HistoryPage({ history, onViewAnalysis, error, onRetry })
         </div>
       )}
 
-      <div className="history-list">
-        {history.length === 0 ? (
+      <div className="history-list" aria-busy={loading ? 'true' : 'false'}>
+        {loading ? (
+          <>
+            {[1, 2, 3].map((idx) => (
+              <div key={idx} className="history-item skeleton-blob" style={{ minHeight: '112px' }}>
+                <div className="history-main" style={{ width: '100%' }}>
+                  <div style={{ flex: 1 }}>
+                    <div className="skeleton-line" style={{ width: '45%', marginBottom: '0.7rem' }}></div>
+                    <div className="skeleton-line" style={{ width: '30%', marginBottom: '0.7rem' }}></div>
+                    <div className="skeleton-line" style={{ width: '50%' }}></div>
+                  </div>
+                  <div style={{ width: '180px' }}>
+                    <div className="skeleton-line" style={{ width: '100%', marginBottom: '0.7rem' }}></div>
+                    <div className="skeleton-line" style={{ width: '70%' }}></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </>
+        ) : history.length === 0 ? (
           <div className="empty-state">
             <span className="empty-icon">📭</span>
             <p>No analyses yet. Upload your first song to get started!</p>

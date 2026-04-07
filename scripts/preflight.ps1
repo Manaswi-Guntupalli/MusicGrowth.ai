@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 $script:HasFailure = $false
 
-Write-Host "MusicGrowth.ai Preflight Check" -ForegroundColor Cyan
+Write-Host "MusicGrowth.AI Preflight Check" -ForegroundColor Cyan
 Write-Host "--------------------------------" -ForegroundColor Cyan
 
 function Pass([string]$msg) { Write-Host "PASS: $msg" -ForegroundColor Green }

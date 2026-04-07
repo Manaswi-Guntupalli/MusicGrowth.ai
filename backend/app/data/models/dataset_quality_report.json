@@ -8,12 +8,12 @@
   "recency": {
     "datasets": [
       {
-        "path": "C:\\Users\\LENOVO\\Downloads\\MusicGrowth.AI\\MusicGrowth.ai\\SpotifyAudioFeaturesApril2019.csv",
+        "path": "C:\\Users\\LENOVO\\Downloads\\MusicGrowth.AI\\MusicGrowth.AI\\SpotifyAudioFeaturesApril2019.csv",
         "exists": true,
         "modified_utc": "2026-04-06T17:44:32.101315+00:00"
       },
       {
-        "path": "C:\\Users\\LENOVO\\Downloads\\MusicGrowth.AI\\MusicGrowth.ai\\SpotifyAudioFeaturesNov2018.csv",
+        "path": "C:\\Users\\LENOVO\\Downloads\\MusicGrowth.AI\\MusicGrowth.AI\\SpotifyAudioFeaturesNov2018.csv",
         "exists": true,
         "modified_utc": "2026-04-06T17:44:32.242675+00:00"
       }

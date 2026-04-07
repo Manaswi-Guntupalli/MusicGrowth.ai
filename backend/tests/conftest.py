@@ -154,7 +154,7 @@ def test_client(fake_db: FakeDB, sample_analysis_result: dict[str, Any], monkeyp
     monkeypatch.setattr("backend.app.routers.analysis._validate_uploaded_audio_file", lambda _path: None)
     monkeypatch.setattr("backend.app.routers.analysis.run_analysis", lambda *_args, **_kwargs: dict(sample_analysis_result))
 
-    app = FastAPI(title="MusicGrowth Test App")
+    app = FastAPI(title="MusicGrowth.AI Test App")
     app.include_router(auth_router, prefix="/api")
     app.include_router(analysis_router, prefix="/api")
 

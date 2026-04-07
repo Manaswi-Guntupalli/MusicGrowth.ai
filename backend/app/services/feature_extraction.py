@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import gcd
 import os
 from typing import Any
 
@@ -10,7 +11,8 @@ os.environ.setdefault("NUMBA_DISABLE_CUDA", "1")
 
 import librosa
 import numpy as np
-from scipy.signal import find_peaks
+import soundfile as sf
+from scipy.signal import find_peaks, resample_poly
 
 
 MIN_VALID_AUDIO_RMS = 1e-4
@@ -37,13 +39,49 @@ class RawFeatures:
     tempo_consistency: float
 
 
+def _to_mono(audio: np.ndarray) -> np.ndarray:
+    if audio.ndim == 1:
+        return audio
+    # soundfile returns shape (frames, channels) for multichannel files.
+    return np.mean(audio, axis=1)
+
+
+def _resample_audio(audio: np.ndarray, source_sr: int, target_sr: int) -> np.ndarray:
+    if source_sr == target_sr:
+        return audio
+
+    ratio_gcd = gcd(int(source_sr), int(target_sr))
+    up = int(target_sr // ratio_gcd)
+    down = int(source_sr // ratio_gcd)
+    return resample_poly(audio, up=up, down=down).astype(np.float32, copy=False)
+
+
 def load_audio(path: str, sr: int = 22050) -> tuple[np.ndarray, int]:
+    y: np.ndarray | None = None
+    sampled_rate: int | None = None
+
     try:
-        y, sampled_rate = librosa.load(path, sr=sr, mono=True)
-    except Exception as exc:
-        raise ValueError("Please upload a valid music audio file (not empty or silent).") from exc
+        decoded, source_sr = sf.read(path, dtype="float32", always_2d=False)
+        y = _to_mono(np.asarray(decoded, dtype=np.float32))
+        sampled_rate = int(source_sr)
+        if sampled_rate <= 0:
+            raise RuntimeError("Invalid sample rate in uploaded audio.")
+
+        if sr > 0 and sampled_rate != sr:
+            y = _resample_audio(y, source_sr=sampled_rate, target_sr=sr)
+            sampled_rate = sr
+    except Exception:
+        # librosa/audioread fallback keeps compatibility when libsndfile can't decode a format.
+        try:
+            y, sampled_rate = librosa.load(path, sr=sr, mono=True)
+        except Exception as exc:
+            raise ValueError("Please upload a valid music audio file (not empty or silent).") from exc
     
-    if len(y) == 0:
+    if y is None or sampled_rate is None or len(y) == 0:
+        raise ValueError("Please upload a valid music audio file (not empty or silent).")
+
+    y = np.asarray(y, dtype=np.float32)
+    if not np.all(np.isfinite(y)):
         raise ValueError("Please upload a valid music audio file (not empty or silent).")
 
     rms = float(np.sqrt(np.mean(np.square(y))))

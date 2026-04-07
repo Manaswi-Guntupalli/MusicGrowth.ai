@@ -1,9 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Chart as ChartJS, RadarController, BarController, CategoryScale, LinearScale, RadialLinearScale, PointElement, LineElement, BarElement, Filler, Tooltip, Legend } from 'chart.js'
 import { Radar, Bar } from 'react-chartjs-2'
 import { jsPDF } from 'jspdf'
-
-const API_BASE = '/api'
+import { requestJson } from '../lib/apiClient'
 
 const FEATURE_ORDER = [
   'tempo',
@@ -34,6 +33,15 @@ const SIMULATOR_CONTROLS = [
   { feature: 'loudness', label: 'Loudness', min: -6, max: 6, step: 0.5, unit: 'dB' },
 ]
 
+const ANALYSIS_TABS = [
+  { id: 'dna', label: '🎨 Sound DNA' },
+  { id: 'similar', label: '🔍 Similar Artists' },
+  { id: 'difference', label: '⚡ Differences' },
+  { id: 'paths', label: '🧭 Creative Paths' },
+  { id: 'market', label: '📈 Market Gap' },
+  { id: 'simulator', label: '🧪 A/B Simulator' },
+]
+
 ChartJS.register(
   RadarController,
   BarController,
@@ -57,6 +65,11 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
   const [simError, setSimError] = useState('')
   const [simResult, setSimResult] = useState(null)
   const [optResult, setOptResult] = useState(null)
+  const [simulatorMode, setSimulatorMode] = useState(null)
+  const [pathsAiLoading, setPathsAiLoading] = useState(false)
+  const [pathsAiError, setPathsAiError] = useState('')
+  const [pathsAiResult, setPathsAiResult] = useState(null)
+  const [activePathCard, setActivePathCard] = useState(0)
   const [adjustments, setAdjustments] = useState(() => {
     const initial = {}
     for (const control of SIMULATOR_CONTROLS) {
@@ -84,11 +97,25 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
   const clusterConfidence = Number(result.style_cluster?.confidence ?? 0)
   const clusterRawConfidence = Number(result.style_cluster?.raw_confidence ?? clusterConfidence)
   const hasRawClusterConfidence = Number.isFinite(Number(result.style_cluster?.raw_confidence))
+  const confidenceLabel = clusterConfidence >= 75 ? 'High Certainty' : clusterConfidence >= 50 ? 'Medium Certainty' : 'Low Certainty'
+  const clusterConfidenceTooltip = 'Calibrated confidence estimates how reliably this track fits the assigned style cluster based on held-out data.'
+  const recommendationConfidenceTooltip = 'Heuristic confidence estimates how stable and trustworthy the recommendation explanation is, not the cluster assignment certainty.'
+  const tabIds = useMemo(() => ANALYSIS_TABS.map((tab) => tab.id), [])
 
-  const baseFeatures = FEATURE_ORDER.reduce((acc, name) => {
-    acc[name] = Number(result.sound_dna?.[name] ?? 0)
-    return acc
-  }, {})
+  const baseFeatures = useMemo(
+    () => FEATURE_ORDER.reduce((acc, name) => {
+      acc[name] = Number(result.sound_dna?.[name] ?? 0)
+      return acc
+    }, {}),
+    [result.sound_dna]
+  )
+
+  useEffect(() => {
+    setPathsAiLoading(false)
+    setPathsAiError('')
+    setPathsAiResult(null)
+    setActivePathCard(0)
+  }, [result?.analysis_id])
 
   async function exportToPDF() {
     if (exporting) return
@@ -211,7 +238,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
       pdf.rect(0, 0, pageWidth, 46, 'F')
       pdf.setTextColor(255, 255, 255)
       pdf.setFontSize(22)
-      pdf.text('MusicGrowth Strategic Analysis', pageWidth / 2, 21, { align: 'center' })
+      pdf.text('MusicGrowth.AI Strategic Analysis', pageWidth / 2, 21, { align: 'center' })
       pdf.setFontSize(11)
       pdf.text('ML decisions with explainable trajectory guidance', pageWidth / 2, 31, { align: 'center' })
 
@@ -328,7 +355,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
       }
 
       const safeLabel = String(result.style_cluster.label || 'analysis').replace(/[^a-z0-9_-]+/gi, '_')
-      pdf.save(`MusicGrowth-Report-${safeLabel}.pdf`)
+      pdf.save(`MusicGrowth.AI-Report-${safeLabel}.pdf`)
     } catch (err) {
       console.error('PDF export error:', err)
       alert('Failed to export PDF. Please try again.')
@@ -419,7 +446,15 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         )}
 
         <p className="explainability-footer">
-          Confidence: <strong>{Number(explainability.confidence || 0).toFixed(3)}</strong> | {explainability.disclaimer || 'ML explanation only.'}
+          <span className="tooltip-wrap">
+            <span className="tooltip-label" tabIndex={0} aria-describedby="recommendation-confidence-tip">
+              Recommendation Confidence (Heuristic)
+            </span>
+            <span className="tooltip-bubble" id="recommendation-confidence-tip" role="tooltip">
+              {recommendationConfidenceTooltip}
+            </span>
+          </span>
+          : <strong>{Number(explainability.confidence || 0).toFixed(3)}</strong> | {explainability.disclaimer || 'ML explanation only.'}
         </p>
       </div>
     )
@@ -438,6 +473,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
     setAdjustments(cleared)
     setSimResult(null)
     setOptResult(null)
+    setSimulatorMode(null)
     setSimError('')
   }
 
@@ -451,23 +487,17 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
     setSimError('')
 
     try {
-      const res = await fetch(`${API_BASE}/optimize-trajectory`, {
+      const body = await requestJson('/optimize-trajectory', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        token,
+        body: {
           base_features: baseFeatures,
           objective: optObjective,
           adjustable_features: SIMULATOR_CONTROLS.map((item) => item.feature),
-        }),
+        },
+        timeoutMs: 20000,
+        retries: 0,
       })
-
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(body.detail || 'Auto-optimize failed.')
-      }
 
       const optimizedAdjustments = { ...adjustments }
       for (const control of SIMULATOR_CONTROLS) {
@@ -482,7 +512,8 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
 
       setAdjustments(optimizedAdjustments)
       setOptResult(body)
-      setSimResult(body.simulation)
+      setSimResult(null)
+      setSimulatorMode('optimize')
     } catch (err) {
       setSimError(err?.message || 'Could not run auto-optimize.')
     } finally {
@@ -507,24 +538,19 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/simulate-trajectory`, {
+      const body = await requestJson('/simulate-trajectory', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        token,
+        body: {
           base_features: baseFeatures,
           adjustments: filteredAdjustments,
-        }),
+        },
+        timeoutMs: 20000,
+        retries: 0,
       })
 
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(body.detail || 'A/B simulation failed.')
-      }
-
       setSimResult(body)
+      setSimulatorMode('simulate')
     } catch (err) {
       setSimError(err?.message || 'Could not run trajectory simulation.')
     } finally {
@@ -532,7 +558,71 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
     }
   }
 
-  const soundDnaData = {
+  function moveCreativePathCard(direction) {
+    const cards = pathsAiResult?.cards || []
+    if (cards.length <= 1) return
+
+    setActivePathCard((prev) => {
+      const next = prev + direction
+      if (next < 0) return cards.length - 1
+      if (next >= cards.length) return 0
+      return next
+    })
+  }
+
+  async function runCreativePathsAiSummary() {
+    if (!token) {
+      setPathsAiError('Missing auth token. Please re-login to generate AI summary.')
+      return
+    }
+
+    if (!(result.paths || []).length) {
+      setPathsAiError('No creative paths are available for summarization.')
+      return
+    }
+
+    setPathsAiLoading(true)
+    setPathsAiError('')
+
+    try {
+      const body = await requestJson('/creative-paths-ai-summary', {
+        method: 'POST',
+        token,
+        body: {
+          sound_dna: result.sound_dna,
+          style_cluster: result.style_cluster,
+          market_gaps: result.market_gaps || [],
+          paths: result.paths || [],
+          differences: (result.differences || []).slice(0, 6),
+        },
+        timeoutMs: 20000,
+        retries: 0,
+      })
+
+      setPathsAiResult(body)
+      setActivePathCard(0)
+    } catch (err) {
+      setPathsAiError(err?.message || 'Could not generate AI summary for creative paths.')
+    } finally {
+      setPathsAiLoading(false)
+    }
+  }
+
+  const creativePathCards = pathsAiResult?.cards || []
+  const activeCreativePath = creativePathCards[activePathCard] || null
+  const optimizeProjection = optResult?.simulation || null
+
+  const differences = useMemo(() => result.differences || [], [result.differences])
+  const soundDnaEntries = useMemo(
+    () => Object.entries(result.sound_dna || {}),
+    [result.sound_dna]
+  )
+  const numericSoundDnaEntries = useMemo(
+    () => soundDnaEntries.filter(([key, value]) => !['mood', 'production_style'].includes(key) && typeof value === 'number'),
+    [soundDnaEntries]
+  )
+
+  const soundDnaData = useMemo(() => ({
     labels: ['Energy', 'Danceability', 'Valence', 'Acousticness', 'Instrumentalness', 'Liveness', 'Speechiness'],
     datasets: [
       {
@@ -553,25 +643,25 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         tension: 0.4,
       },
     ],
-  }
+  }), [result.sound_dna])
 
-  const differenceData = {
-    labels: (result.differences || []).map(d => d.feature),
+  const differenceData = useMemo(() => ({
+    labels: differences.map((d) => d.feature),
     datasets: [
       {
         label: 'Your Value',
-        data: (result.differences || []).map(d => d.song_value),
+        data: differences.map((d) => d.song_value),
         backgroundColor: '#6f5cff',
       },
       {
         label: 'Cluster Average',
-        data: (result.differences || []).map(d => d.reference_mean),
+        data: differences.map((d) => d.reference_mean),
         backgroundColor: '#29b6f6',
       },
     ],
-  }
+  }), [differences])
 
-  const chartOptions = {
+  const chartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: true,
     plugins: {
@@ -580,9 +670,9 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
     scales: {
       r: { beginAtZero: true, max: 1, ticks: { color: chartTickColor }, grid: { color: chartGridColor } },
     },
-  }
+  }), [chartGridColor, chartTextColor, chartTickColor])
 
-  const barOptions = {
+  const barOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: true,
     indexAxis: 'y',
@@ -593,6 +683,43 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
       x: { ticks: { color: chartTickColor }, grid: { color: chartGridColor } },
       y: { ticks: { color: chartTickColor } },
     },
+  }), [chartGridColor, chartTextColor, chartTickColor])
+
+  function handleTabsKeyDown(event, currentTabId) {
+    const currentIndex = tabIds.indexOf(currentTabId)
+    if (currentIndex < 0) return
+
+    const activateAndFocus = (nextTabId) => {
+      setActiveTab(nextTabId)
+      requestAnimationFrame(() => {
+        const target = document.getElementById(`analysis-tab-${nextTabId}`)
+        if (target instanceof HTMLElement) {
+          target.focus()
+        }
+      })
+    }
+
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault()
+      const nextIndex = (currentIndex + 1) % tabIds.length
+      activateAndFocus(tabIds[nextIndex])
+    }
+
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      const prevIndex = (currentIndex - 1 + tabIds.length) % tabIds.length
+      activateAndFocus(tabIds[prevIndex])
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault()
+      activateAndFocus(tabIds[0])
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault()
+      activateAndFocus(tabIds[tabIds.length - 1])
+    }
   }
 
   return (
@@ -617,38 +744,48 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
             <div className="confidence-fill" style={{ width: `${clusterConfidence}%` }}></div>
           </div>
           <p>
-            {clusterConfidence.toFixed(1)}% Calibrated Confidence
+            {clusterConfidence.toFixed(1)}%
+            {' '}
+            <span className="tooltip-wrap">
+              <span className="tooltip-label" tabIndex={0} aria-describedby="cluster-confidence-tip">
+                Cluster Confidence (Calibrated)
+              </span>
+              <span className="tooltip-bubble" id="cluster-confidence-tip" role="tooltip">
+                {clusterConfidenceTooltip}
+              </span>
+            </span>
+            {` • ${confidenceLabel}`}
             {hasRawClusterConfidence ? ` (Raw ${clusterRawConfidence.toFixed(1)}%)` : ''}
           </p>
         </div>
       </section>
 
       <div className="tabs-container">
-        <div className="tabs">
-          <button className={`tab ${activeTab === 'dna' ? 'active' : ''}`} onClick={() => setActiveTab('dna')}>
-            🎨 Sound DNA
-          </button>
-          <button className={`tab ${activeTab === 'similar' ? 'active' : ''}`} onClick={() => setActiveTab('similar')}>
-            🔍 Similar Artists
-          </button>
-          <button className={`tab ${activeTab === 'difference' ? 'active' : ''}`} onClick={() => setActiveTab('difference')}>
-            ⚡ Differences
-          </button>
-          <button className={`tab ${activeTab === 'paths' ? 'active' : ''}`} onClick={() => setActiveTab('paths')}>
-            🧭 Creative Paths
-          </button>
-          <button className={`tab ${activeTab === 'market' ? 'active' : ''}`} onClick={() => setActiveTab('market')}>
-            📈 Market Gap
-          </button>
-          <button className={`tab ${activeTab === 'simulator' ? 'active' : ''}`} onClick={() => setActiveTab('simulator')}>
-            🧪 A/B Simulator
-          </button>
+        <div className="tabs" role="tablist" aria-label="Analysis sections">
+          {ANALYSIS_TABS.map((tab) => {
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                id={`analysis-tab-${tab.id}`}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`analysis-panel-${tab.id}`}
+                tabIndex={isActive ? 0 : -1}
+                className={`tab ${isActive ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+                onKeyDown={(event) => handleTabsKeyDown(event, tab.id)}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
       <div className="tab-content">
         {activeTab === 'dna' && (
-          <section className="tab-pane slide-up">
+          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-dna" aria-labelledby="analysis-tab-dna" tabIndex={0}>
             <h3>Your Sound DNA Profile</h3>
             <p className="mood-style">
               Mood: <strong>{result.sound_dna.mood || 'Unknown'}</strong> | Production: <strong>{result.sound_dna.production_style || 'Unknown'}</strong>
@@ -657,21 +794,18 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
               <Radar data={soundDnaData} options={chartOptions} />
             </div>
             <div className="features-grid">
-              {Object.entries(result.sound_dna).map(([key, value]) => {
-                if (['mood', 'production_style'].includes(key) || typeof value !== 'number') return null
-                return (
-                  <div key={key} className="feature-card">
-                    <span className="feature-name">{key}</span>
-                    <span className="feature-value">{value.toFixed(3)}</span>
-                  </div>
-                )
-              })}
+              {numericSoundDnaEntries.map(([key, value]) => (
+                <div key={key} className="feature-card">
+                  <span className="feature-name">{key}</span>
+                  <span className="feature-value">{value.toFixed(3)}</span>
+                </div>
+              ))}
             </div>
           </section>
         )}
 
         {activeTab === 'similar' && (
-          <section className="tab-pane slide-up">
+          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-similar" aria-labelledby="analysis-tab-similar" tabIndex={0}>
             <h3>Top Similar Tracks</h3>
             <div className="similar-list">
               {(result.top_similar || []).map((item, idx) => (
@@ -695,15 +829,15 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         )}
 
         {activeTab === 'difference' && (
-          <section className="tab-pane slide-up">
+          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-difference" aria-labelledby="analysis-tab-difference" tabIndex={0}>
             <h3>How You Compare</h3>
-            {(result.differences || []).length > 0 && (
+            {differences.length > 0 && (
               <div className="chart-container">
                 <Bar data={differenceData} options={barOptions} />
               </div>
             )}
             <div className="difference-details">
-              {(result.differences || []).map((diff, idx) => {
+              {differences.map((diff, idx) => {
                 const tagKey = normalizeDiffTag(diff.tag)
                 const tagLabel = displayDiffTag(diff.tag)
                 return (
@@ -722,7 +856,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         )}
 
         {activeTab === 'paths' && (
-          <section className="tab-pane slide-up">
+          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-paths" aria-labelledby="analysis-tab-paths" tabIndex={0}>
             <h3>Your Creative Paths</h3>
             <div className="paths-grid">
               {(result.paths || []).map((path) => (
@@ -745,11 +879,106 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                 </div>
               ))}
             </div>
+
+            <div className="creative-ai-actions">
+              <button className="history-view-btn" onClick={runCreativePathsAiSummary} disabled={pathsAiLoading}>
+                {pathsAiLoading ? 'Generating AI Summary...' : 'AI Summary For All 3 Paths'}
+              </button>
+            </div>
+
+            {pathsAiError && <div className="error-message">{pathsAiError}</div>}
+
+            {activeCreativePath && (
+              <div className="creative-ai-slider-panel slide-up">
+                <div className="creative-ai-slider-top">
+                  <h4>AI Summary: Creative Paths</h4>
+                  <span className={`explainability-source source-${pathsAiResult?.source || 'ml-local'}`}>
+                    {pathsAiResult?.source === 'openai' ? 'OpenAI summary layer' : 'ML local summary'}
+                  </span>
+                </div>
+
+                <div className="creative-ai-slider-shell">
+                  <button
+                    className="creative-ai-nav"
+                    onClick={() => moveCreativePathCard(-1)}
+                    disabled={creativePathCards.length <= 1}
+                    aria-label="Previous creative path summary"
+                  >
+                    ◀
+                  </button>
+
+                  <article className="creative-ai-card">
+                    <div className="creative-ai-card-header">
+                      <span className="path-number">{activeCreativePath.id || String(activePathCard + 1)}</span>
+                      <h5>{activeCreativePath.title || 'Creative Path'}</h5>
+                    </div>
+
+                    <p className="creative-ai-line"><strong>Summary:</strong> {activeCreativePath.summary || 'No summary available.'}</p>
+                    <p className="creative-ai-line"><strong>Rationale:</strong> {activeCreativePath.rationale || 'No rationale available.'}</p>
+
+                    <div className="creative-ai-grid">
+                      <div className="creative-ai-block">
+                        <h6>Immediate actions</h6>
+                        <ul>
+                          {(activeCreativePath.immediate_actions || []).map((row, idx) => (
+                            <li key={`action-${idx}`}>{row}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="creative-ai-block">
+                        <h6>Caution points</h6>
+                        <ul>
+                          {(activeCreativePath.caution_points || []).map((row, idx) => (
+                            <li key={`caution-${idx}`}>{row}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="creative-ai-block">
+                        <h6>Success KPIs</h6>
+                        <ul>
+                          {(activeCreativePath.success_kpis || []).map((row, idx) => (
+                            <li key={`kpi-${idx}`}>{row}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </article>
+
+                  <button
+                    className="creative-ai-nav"
+                    onClick={() => moveCreativePathCard(1)}
+                    disabled={creativePathCards.length <= 1}
+                    aria-label="Next creative path summary"
+                  >
+                    ▶
+                  </button>
+                </div>
+
+                {creativePathCards.length > 1 && (
+                  <div className="creative-ai-dots">
+                    {creativePathCards.map((card, idx) => (
+                      <button
+                        key={`${card.id || card.title || 'path'}-${idx}`}
+                        className={`creative-ai-dot ${idx === activePathCard ? 'active' : ''}`}
+                        onClick={() => setActivePathCard(idx)}
+                        aria-label={`Show summary card ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <p className="creative-ai-disclaimer">
+                  {pathsAiResult?.disclaimer || 'AI summary generated from your current analysis outcomes.'}
+                </p>
+              </div>
+            )}
           </section>
         )}
 
         {activeTab === 'market' && (
-          <section className="tab-pane slide-up">
+          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-market" aria-labelledby="analysis-tab-market" tabIndex={0}>
             <h3>Market Opportunities</h3>
             <div className="market-gaps">
               {(result.market_gaps && result.market_gaps.length > 0) ? (
@@ -769,7 +998,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         )}
 
         {activeTab === 'simulator' && (
-          <section className="tab-pane slide-up">
+          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-simulator" aria-labelledby="analysis-tab-simulator" tabIndex={0}>
             <h3>A/B Trajectory Simulator</h3>
             <p className="mood-style">Adjust selected features in small increments and simulate how your cluster fit, similarity, and market opportunity may shift before re-producing.</p>
 
@@ -823,23 +1052,81 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
 
             {simError && <div className="error-message">{simError}</div>}
 
-            {optResult && (
-              <div className="sim-insights" style={{ marginBottom: '1rem' }}>
-                <h4>Auto-optimize Summary</h4>
-                <ul>
-                  <li>Objective: {optResult.objective === 'opportunity' ? 'Max Opportunity' : 'Max Similarity'}</li>
-                  <li>Baseline Score: {optResult.objective === 'opportunity' ? formatOpportunity(optResult.baseline_score) : Number(optResult.baseline_score || 0).toFixed(3)}</li>
-                  <li>Optimized Score: {optResult.objective === 'opportunity' ? formatOpportunity(optResult.optimized_score) : Number(optResult.optimized_score || 0).toFixed(3)}</li>
-                  <li>
-                    Improvement: {Number(optResult.improvement || 0) >= 0 ? '+' : ''}
-                    {optResult.objective === 'opportunity' ? formatOpportunity(optResult.improvement) : Number(optResult.improvement || 0).toFixed(3)}
-                  </li>
-                </ul>
-                {renderExplainability(optResult.explainability)}
+            {simulatorMode === 'optimize' && optResult && (
+              <div className="sim-results">
+                <div className="sim-insights" style={{ marginBottom: '1rem' }}>
+                  <h4>Auto-optimize Projection</h4>
+                  <ul>
+                    <li>Objective: {optResult.objective === 'opportunity' ? 'Max Opportunity' : 'Max Similarity'}</li>
+                    <li>Baseline Score: {optResult.objective === 'opportunity' ? formatOpportunity(optResult.baseline_score) : Number(optResult.baseline_score || 0).toFixed(3)}</li>
+                    <li>Optimized Score: {optResult.objective === 'opportunity' ? formatOpportunity(optResult.optimized_score) : Number(optResult.optimized_score || 0).toFixed(3)}</li>
+                    <li>
+                      Improvement: {Number(optResult.improvement || 0) >= 0 ? '+' : ''}
+                      {optResult.objective === 'opportunity' ? formatOpportunity(optResult.improvement) : Number(optResult.improvement || 0).toFixed(3)}
+                    </li>
+                  </ul>
+
+                  {optimizeProjection && (
+                    <>
+                      <div className="sim-kpi-grid" style={{ marginTop: '0.9rem' }}>
+                        <div className="sim-kpi-card">
+                          <h4>Cluster</h4>
+                          <p>{optimizeProjection.before.style_cluster.label}</p>
+                          <span>→ {optimizeProjection.after.style_cluster.label}</span>
+                        </div>
+                        <div className="sim-kpi-card">
+                          <h4>Avg Similarity</h4>
+                          <p>{optimizeProjection.before.avg_similarity.toFixed(2)}%</p>
+                          <span className={optimizeProjection.similarity_delta >= 0 ? 'sim-positive' : 'sim-negative'}>
+                            {optimizeProjection.similarity_delta >= 0 ? '+' : ''}{optimizeProjection.similarity_delta.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="sim-kpi-card">
+                          <h4>Opportunity Score</h4>
+                          <p>{formatOpportunity(optimizeProjection.before.opportunity_score)}</p>
+                          <span className={optimizeProjection.opportunity_delta >= 0 ? 'sim-positive' : 'sim-negative'}>
+                            {optimizeProjection.opportunity_delta >= 0 ? '+' : ''}{formatOpportunity(optimizeProjection.opportunity_delta)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <h5 style={{ marginTop: '0.9rem' }}>Projected insights</h5>
+                      <ul>
+                        {(optimizeProjection.insights || []).map((line, idx) => (
+                          <li key={idx}>{line}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+
+                  {renderExplainability(optResult.explainability)}
+                </div>
+
+                {optimizeProjection && (
+                  <div className="sim-after-list">
+                    <h4>Projected Top Similar Tracks (Optimized B)</h4>
+                    {(optimizeProjection.after.top_similar || []).map((item, idx) => (
+                      <div key={`${item.artist}-${item.song}-${idx}`} className="similar-item">
+                        <div className="similar-rank">{idx + 1}</div>
+                        <div className="similar-info">
+                          <h4>{item.artist || 'Unknown'}</h4>
+                          <p>{item.song || 'Unknown'}</p>
+                          <span className="cluster-tag">{item.cluster || 'N/A'}</span>
+                        </div>
+                        <div className="similarity-score">
+                          <div className="score-bar">
+                            <div className="score-fill" style={{ width: `${item.similarity || 0}%` }}></div>
+                          </div>
+                          <span>{(item.similarity || 0).toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
-            {simResult && (
+            {simulatorMode === 'simulate' && simResult && (
               <div className="sim-results">
                 <div className="sim-kpi-grid">
                   <div className="sim-kpi-card">

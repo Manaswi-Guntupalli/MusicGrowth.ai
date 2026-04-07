@@ -1,6 +1,5 @@
 import { useState } from 'react'
-
-const API_BASE = '/api'
+import { requestJson } from '../lib/apiClient'
 
 export default function LandingPage({ onLogin, theme, onToggleTheme }) {
   const [authMode, setAuthMode] = useState('login')
@@ -19,18 +18,17 @@ export default function LandingPage({ onLogin, theme, onToggleTheme }) {
           ? { email: authForm.email, password: authForm.password }
           : { name: authForm.name, email: authForm.email, password: authForm.password }
 
-      const res = await fetch(`${API_BASE}${endpoint}`, {
+      const body = await requestJson(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: payload,
+        timeoutMs: 12000,
+        retries: 0,
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.detail || 'Authentication failed')
 
       onLogin(body.access_token, body.user)
       setAuthForm({ name: '', email: '', password: '' })
     } catch (err) {
-      setAuthError(err.message || 'Authentication failed')
+      setAuthError(err?.message || 'Authentication failed')
     } finally {
       setAuthLoading(false)
     }
@@ -43,7 +41,7 @@ export default function LandingPage({ onLogin, theme, onToggleTheme }) {
       </button>
       <section className="hero-landing">
         <div className="hero-content-fade" />
-        <h1 className="fade-in">MusicGrowth.ai</h1>
+        <h1 className="fade-in">MusicGrowth.AI</h1>
         <p className="fade-in delay-1">
           Discover where your music sits in the market, what makes it unique, and which path can
           grow your audience with intention.

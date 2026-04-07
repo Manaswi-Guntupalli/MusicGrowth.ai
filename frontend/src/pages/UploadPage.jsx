@@ -1,12 +1,43 @@
 import { useState } from 'react'
+import { requestJson } from '../lib/apiClient'
 
-const API_BASE = '/api'
-
-export default function UploadPage({ token, onAnalysisComplete }) {
+export default function UploadPage({ token, onAnalysisComplete, onAnalysisStateChange }) {
   const [file, setFile] = useState(null)
   const [segmentMode, setSegmentMode] = useState('best')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  function toUploadErrorMessage(err) {
+    const rawMessage = String(err?.message || '').trim()
+    const status = Number(err?.status || 0)
+    const code = String(err?.code || '')
+
+    if (status === 413) {
+      return 'File is too large. Please upload a track under 25 MB or increase the upload limit in settings.'
+    }
+
+    if (status === 415 || /unsupported file type|unsupported media format/i.test(rawMessage)) {
+      return 'Unsupported format. Please upload MP3, WAV, FLAC, M4A, or OGG audio.'
+    }
+
+    if (status === 400 && /corrupted|could not be parsed|unsupported/i.test(rawMessage)) {
+      return 'The file could not be decoded. Re-export it as MP3 or WAV and try again.'
+    }
+
+    if (/empty|silent|valid music audio|audio file appears empty/i.test(rawMessage)) {
+      return 'Please upload a valid music audio file that contains audible content.'
+    }
+
+    if (code === 'TIMEOUT') {
+      return 'Upload timed out. Check your connection and try a smaller file.'
+    }
+
+    if (code === 'NETWORK_ERROR') {
+      return 'Network issue detected. Verify internet/backend connection and try again.'
+    }
+
+    return rawMessage || 'Could not analyze this file. Please try again.'
+  }
 
   async function handleAnalyze(e) {
     e.preventDefault()
@@ -17,38 +48,25 @@ export default function UploadPage({ token, onAnalysisComplete }) {
 
     setLoading(true)
     setError('')
+    onAnalysisStateChange?.(true)
 
     const form = new FormData()
     form.append('file', file)
 
     try {
-      console.log(`Sending analyze request to ${API_BASE}/analyze?segment_mode=${segmentMode}`)
-      const res = await fetch(`${API_BASE}/analyze?segment_mode=${segmentMode}`, {
+      const data = await requestJson(`/analyze?segment_mode=${segmentMode}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
         body: form,
+        token,
+        timeoutMs: 90000,
+        retries: 0,
       })
-
-      console.log('Analyze response status:', res.status)
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        console.error('Analyze error response:', body)
-        throw new Error(body.detail || 'Analysis failed')
-      }
-
-      const data = await res.json()
-      console.log('Analyze success response:', data)
       onAnalysisComplete(data)
     } catch (err) {
-      console.error('Analyze error:', err)
-      const message = err?.message || 'Could not analyze this file.'
-      if (/empty|silent|valid music audio|audio file appears empty/i.test(message)) {
-        setError('Please upload a valid music audio file (not empty or silent).')
-      } else {
-        setError(message)
-      }
+      setError(toUploadErrorMessage(err))
     } finally {
       setLoading(false)
+      onAnalysisStateChange?.(false)
     }
   }
 

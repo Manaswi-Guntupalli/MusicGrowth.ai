@@ -1,4 +1,4 @@
-# MusicGrowth.ai Full Run Guide
+# MusicGrowth.AI Full Run Guide
 
 If you want the shortest teammate setup path, use:
 
@@ -114,7 +114,7 @@ Terminal 2 (frontend):
 
 Health check:
 
- - Invoke-RestMethod http://127.0.0.1:8000/api/health
+- Invoke-RestMethod http://127.0.0.1:8000/api/health
 
 ## 6. Full App Flow (What You Should See)
 
@@ -196,7 +196,7 @@ PowerShell example:
 
 Register:
 
-- Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/auth/register -ContentType application/json -Body '{"name":"Test","email":"test1@musicgrowth.ai","password":"demo1234"}'
+- Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/auth/register -ContentType application/json -Body '{"name":"Test","email":"test1@MusicGrowth.AI","password":"demo1234"}'
 
 Analyze with token:
 

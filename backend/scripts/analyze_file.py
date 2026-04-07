@@ -7,7 +7,7 @@ from app.services.pipeline import run_analysis
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Analyze a local audio clip with MusicGrowth pipeline.")
+    parser = argparse.ArgumentParser(description="Analyze a local audio clip with MusicGrowth.AI pipeline.")
     parser.add_argument("audio_path", help="Path to local audio file")
     parser.add_argument("--segment-mode", choices=["best", "full"], default="best")
     args = parser.parse_args()

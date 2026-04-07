@@ -17,11 +17,14 @@ from ..dependencies.auth import get_current_user
 from ..models.schemas import (
     AnalysisHistoryItem,
     AnalysisResponse,
+    CreativePathAISummaryRequest,
+    CreativePathAISummaryResponse,
     TrajectoryOptimizationRequest,
     TrajectoryOptimizationResponse,
     TrajectorySimulationRequest,
     TrajectorySimulationResponse,
 )
+from ..services.explainability import build_creative_paths_ai_summary
 from ..services.pipeline import run_analysis
 from ..services.trajectory import run_auto_optimize, run_trajectory_simulation
 
@@ -142,10 +145,16 @@ async def analyze_song(
     except HTTPException:
         raise
     except ValueError as exc:
-        logger.warning("Audio analysis validation failed for file=%s user=%s", file.filename, current_user.get("id"))
+        detail = str(exc).strip() or "Unable to analyze this audio file. Please upload a valid, non-corrupted music track."
+        logger.warning(
+            "Audio analysis validation failed for file=%s user=%s detail=%s",
+            file.filename,
+            current_user.get("id"),
+            detail,
+        )
         raise HTTPException(
             status_code=400,
-            detail="Unable to analyze this audio file. Please upload a valid, non-corrupted music track.",
+            detail=detail,
         ) from exc
     except Exception as exc:  # pragma: no cover - safe API guard
         logger.exception("Audio analysis failed unexpectedly for file=%s user=%s", file.filename, current_user.get("id"))
@@ -209,6 +218,26 @@ async def simulate_trajectory(
         raise HTTPException(
             status_code=500,
             detail="Trajectory simulation failed due to an internal error. Please try again.",
+        ) from exc
+
+
+@router.post("/creative-paths-ai-summary", response_model=CreativePathAISummaryResponse)
+async def creative_paths_ai_summary(
+    payload: CreativePathAISummaryRequest,
+    current_user: dict = Depends(get_current_user),
+) -> CreativePathAISummaryResponse:
+    _ = current_user
+
+    try:
+        summarized = build_creative_paths_ai_summary(payload.model_dump())
+        return CreativePathAISummaryResponse(**summarized)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - safe API guard
+        logger.exception("Creative paths AI summary failed unexpectedly for user=%s", current_user.get("id"))
+        raise HTTPException(
+            status_code=500,
+            detail="Creative paths AI summary failed due to an internal error. Please try again.",
         ) from exc
 
 
