@@ -74,10 +74,10 @@ export default function App() {
 
   if (bootstrapping) {
     return (
-      <div className="app-bootstrap" role="status" aria-live="polite" aria-busy="true">
-        <div className="app-bootstrap-card skeleton-blob">
-          <div className="skeleton-line" style={{ width: '180px', height: '1.5rem', marginBottom: '0.75rem' }}></div>
-          <div className="skeleton-line" style={{ width: '260px', height: '0.9rem' }}></div>
+      <div className="min-h-screen flex items-center justify-center px-6" role="status" aria-live="polite" aria-busy="true">
+        <div className="skeleton-blob w-full max-w-md p-8">
+          <div className="skeleton-line mb-3 h-6 w-44"></div>
+          <div className="skeleton-line h-4 w-64"></div>
         </div>
       </div>
     )

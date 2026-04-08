@@ -636,3 +636,9 @@ def feature_importance_for_song(song_features: dict[str, float], cluster_id: int
 def get_market_profile() -> dict[str, dict[str, float]]:
     model = get_similarity_model()
     return model["market_profile"]
+
+
+def get_cluster_labels() -> dict[int, str]:
+    model = get_similarity_model()
+    labels = model.get("cluster_labels", {})
+    return {int(k): str(v) for k, v in labels.items()}

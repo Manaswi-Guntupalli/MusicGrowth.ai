@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { requestJson } from '../lib/apiClient'
 
-export default function UploadPage({ token, onAnalysisComplete, onAnalysisStateChange }) {
+export default function UploadPage({ token, onAnalysisComplete, onAnalysisStateChange, theme = 'dark' }) {
   const [file, setFile] = useState(null)
   const [segmentMode, setSegmentMode] = useState('best')
   const [loading, setLoading] = useState(false)
@@ -71,111 +72,69 @@ export default function UploadPage({ token, onAnalysisComplete, onAnalysisStateC
   }
 
   return (
-    <div className="page-content fade-in">
-      <section className="upload-section">
-        <div className="upload-header">
-          <h2>Upload Your Track</h2>
-          <p>Analyze your music and discover your unique sound signature</p>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className="max-w-[900px]"
+    >
+      <h1 className={`mb-1 text-[28px] font-semibold ${theme === 'dark' ? 'text-white' : 'text-[#111827]'}`}>Upload Your Track</h1>
+      <p className={`mb-8 text-[14px] ${theme === 'dark' ? 'text-[#9CA3AF]' : 'text-[#6B7280]'}`}>
+        Analyze your music and discover your unique sound signature
+      </p>
+
+      <form onSubmit={handleAnalyze} className="space-y-6">
+        <label className="block cursor-pointer">
+          <div className={`mb-6 flex min-h-[200px] flex-col items-center justify-center rounded-xl border-2 border-dashed p-16 text-center transition-colors hover:border-[#6C5CE7]/50 ${theme === 'dark' ? 'border-white/10 bg-[#111827]' : 'border-[#CBD5E1] bg-white'}`}>
+            <p className={`text-[14px] ${theme === 'dark' ? 'text-[#9CA3AF]' : 'text-[#4B5563]'}`}>{file ? file.name : 'Drag & drop or click to select a file'}</p>
+            <p className={`mt-2 text-[12px] ${theme === 'dark' ? 'text-[#5B6278]' : 'text-[#6B7280]'}`}>Supported: MP3, WAV, FLAC, M4A, OGG</p>
+          </div>
+          <input
+            type="file"
+            accept=".mp3,.wav,.m4a,.flac,.ogg"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="hidden"
+          />
+        </label>
+
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <label className={`flex cursor-pointer flex-col gap-1 rounded-xl border p-4 has-[:checked]:border-[#6C5CE7]/50 has-[:checked]:bg-[#6C5CE7]/5 ${theme === 'dark' ? 'border-white/10 bg-[#111827]' : 'border-[#CBD5E1] bg-white'}`}>
+            <input
+              type="radio"
+              name="segment"
+              value="best"
+              checked={segmentMode === 'best'}
+              onChange={(e) => setSegmentMode(e.target.value)}
+              className="sr-only"
+            />
+            <span className={`text-[15px] font-medium ${theme === 'dark' ? 'text-white' : 'text-[#111827]'}`}>Best 30s Segment</span>
+            <span className={`text-[13px] ${theme === 'dark' ? 'text-[#9CA3AF]' : 'text-[#6B7280]'}`}>Analyzes the most energetic part</span>
+          </label>
+
+          <label className={`flex cursor-pointer flex-col gap-1 rounded-xl border p-4 has-[:checked]:border-[#6C5CE7]/50 has-[:checked]:bg-[#6C5CE7]/5 ${theme === 'dark' ? 'border-white/10 bg-[#111827]' : 'border-[#CBD5E1] bg-white'}`}>
+            <input
+              type="radio"
+              name="segment"
+              value="full"
+              checked={segmentMode === 'full'}
+              onChange={(e) => setSegmentMode(e.target.value)}
+              className="sr-only"
+            />
+            <span className={`text-[15px] font-medium ${theme === 'dark' ? 'text-white' : 'text-[#111827]'}`}>Full Audio</span>
+            <span className={`text-[13px] ${theme === 'dark' ? 'text-[#9CA3AF]' : 'text-[#6B7280]'}`}>Analyzes the entire track</span>
+          </label>
         </div>
 
-        <form onSubmit={handleAnalyze} className="upload-form">
-          <div className="file-upload-zone">
-            <label className="file-input-label">
-              <div className={`file-input-visual ${loading ? 'analyzing' : ''}`}>
-                {loading && (
-                  <div className="upload-note-cloud" aria-hidden="true">
-                    <span className="upload-note n1">♪</span>
-                    <span className="upload-note n2">♫</span>
-                    <span className="upload-note n3">♪</span>
-                    <span className="upload-note n4">♫</span>
-                    <span className="upload-note n5">♪</span>
-                    <span className="upload-note n6">♫</span>
-                  </div>
-                )}
-                <span className="upload-icon">🎵</span>
-                <span className="upload-text">
-                  {file ? file.name : 'Drag & drop or click to select'}
-                </span>
-              </div>
-              <input
-                type="file"
-                accept=".mp3,.wav,.m4a,.flac,.ogg"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="hidden-input"
-              />
-            </label>
-          </div>
+        <button
+          type="submit"
+          disabled={loading || !file}
+          className="h-12 w-full rounded-xl bg-gradient-to-r from-[#6C5CE7] to-[#00CEC9] text-[15px] font-medium text-white transition-all hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? 'Analyzing your sound...' : 'Analyze My Sound'}
+        </button>
 
-          <div className="segment-options">
-            <label className="segment-item">
-              <input
-                type="radio"
-                name="segment"
-                value="best"
-                checked={segmentMode === 'best'}
-                onChange={(e) => setSegmentMode(e.target.value)}
-              />
-              <span className="segment-label">
-                <span className="segment-title">Best 30s Segment</span>
-                <span className="segment-desc">Analyzes the most energetic part</span>
-              </span>
-            </label>
-            <label className="segment-item">
-              <input
-                type="radio"
-                name="segment"
-                value="full"
-                checked={segmentMode === 'full'}
-                onChange={(e) => setSegmentMode(e.target.value)}
-              />
-              <span className="segment-label">
-                <span className="segment-title">Full Audio</span>
-                <span className="segment-desc">Analyzes the entire track</span>
-              </span>
-            </label>
-          </div>
-
-          <button 
-            type="submit" 
-            disabled={loading || !file}
-            className="analyze-btn"
-          >
-            {loading ? (
-              <>
-                <span className="spinner"></span>
-                Analyzing your sound...
-              </>
-            ) : (
-              <>
-                <span className="btn-icon">🚀</span>
-                Analyze My Sound
-              </>
-            )}
-          </button>
-
-          {error && <div className="error-message">{error}</div>}
-        </form>
-      </section>
-
-      <section className="info-section">
-        <div className="info-grid">
-          <div className="info-card">
-            <span className="info-icon">🎨</span>
-            <h3>Sound DNA</h3>
-            <p>Get a 14-dimensional analysis of your sound profile</p>
-          </div>
-          <div className="info-card">
-            <span className="info-icon">🔍</span>
-            <h3>Comparisons</h3>
-            <p>See how you compare to similar artists</p>
-          </div>
-          <div className="info-card">
-            <span className="info-icon">🧭</span>
-            <h3>Strategic Paths</h3>
-            <p>Discover growth opportunities for your music</p>
-          </div>
-        </div>
-      </section>
-    </div>
+        {error ? <p className="text-[13px] text-[#E17055]">{error}</p> : null}
+      </form>
+    </motion.div>
   )
 }

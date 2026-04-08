@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Chart as ChartJS, RadarController, BarController, CategoryScale, LinearScale, RadialLinearScale, PointElement, LineElement, BarElement, Filler, Tooltip, Legend } from 'chart.js'
 import { Radar, Bar } from 'react-chartjs-2'
 import { jsPDF } from 'jspdf'
 import { requestJson } from '../lib/apiClient'
+import Card from '../components/ui/Card'
+import Badge from '../components/ui/Badge'
+import Button from '../components/ui/Button'
+import ProgressBar from '../components/ui/ProgressBar'
+import SliderInput from '../components/ui/SliderInput'
+import TabBar from '../components/ui/TabBar'
+import { typographyTokens } from '../theme/tokens'
+import { buildBarOptions, buildRadarOptions, chartTheme } from '../theme/chartTheme'
 
 const FEATURE_ORDER = [
   'tempo',
@@ -34,12 +43,12 @@ const SIMULATOR_CONTROLS = [
 ]
 
 const ANALYSIS_TABS = [
-  { id: 'dna', label: '🎨 Sound DNA' },
-  { id: 'similar', label: '🔍 Similar Artists' },
-  { id: 'difference', label: '⚡ Differences' },
-  { id: 'paths', label: '🧭 Creative Paths' },
-  { id: 'market', label: '📈 Market Gap' },
-  { id: 'simulator', label: '🧪 A/B Simulator' },
+  { id: 'dna', label: 'Sound DNA' },
+  { id: 'similar', label: 'Similar Artists' },
+  { id: 'difference', label: 'Differences' },
+  { id: 'paths', label: 'Creative Paths' },
+  { id: 'market', label: 'Market Gap' },
+  { id: 'simulator', label: 'A/B Simulator' },
 ]
 
 ChartJS.register(
@@ -77,10 +86,6 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
     }
     return initial
   })
-
-  const chartTextColor = theme === 'light' ? '#3b4260' : '#e0e7ff'
-  const chartTickColor = theme === 'light' ? '#63708f' : '#94a3b8'
-  const chartGridColor = theme === 'light' ? 'rgba(99, 112, 143, 0.18)' : 'rgba(255, 255, 255, 0.1)'
 
   // Safety checks
   if (!result || !result.sound_dna || !result.style_cluster) {
@@ -357,7 +362,6 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
       const safeLabel = String(result.style_cluster.label || 'analysis').replace(/[^a-z0-9_-]+/gi, '_')
       pdf.save(`MusicGrowth.AI-Report-${safeLabel}.pdf`)
     } catch (err) {
-      console.error('PDF export error:', err)
       alert('Failed to export PDF. Please try again.')
     } finally {
       setExporting(false)
@@ -393,9 +397,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
       <div className="explainability-panel">
         <div className="explainability-header">
           <h4>Why this recommendation?</h4>
-          <span className={`explainability-source source-${explainability.source || 'ml-local'}`}>
-            {explainability.source === 'openai' ? 'OpenAI explanation layer' : 'ML-generated explanation'}
-          </span>
+          <Badge variant="local">Local analysis</Badge>
         </div>
 
         <p className="explainability-summary">{explainability.summary || 'No explanation summary available.'}</p>
@@ -636,11 +638,14 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
           result.sound_dna.liveness || 0,
           result.sound_dna.speechiness || 0,
         ],
-        borderColor: '#6f5cff',
-        backgroundColor: 'rgba(111, 92, 255, 0.1)',
-        borderWidth: 2,
+        borderColor: chartTheme.radar.stroke,
+        backgroundColor: chartTheme.radar.fill,
+        borderWidth: chartTheme.radar.borderWidth,
         fill: true,
         tension: 0.4,
+        pointRadius: chartTheme.radar.pointRadius,
+        pointBackgroundColor: chartTheme.radar.point,
+        pointBorderColor: chartTheme.radar.point,
       },
     ],
   }), [result.sound_dna])
@@ -651,39 +656,23 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
       {
         label: 'Your Value',
         data: differences.map((d) => d.song_value),
-        backgroundColor: '#6f5cff',
+        backgroundColor: chartTheme.bar.yourValue,
+        borderRadius: 4,
+        barThickness: 20,
       },
       {
         label: 'Cluster Average',
         data: differences.map((d) => d.reference_mean),
-        backgroundColor: '#29b6f6',
+        backgroundColor: chartTheme.bar.clusterValue,
+        borderRadius: 4,
+        barThickness: 20,
       },
     ],
   }), [differences])
 
-  const chartOptions = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: true,
-    plugins: {
-      legend: { display: true, labels: { color: chartTextColor } },
-    },
-    scales: {
-      r: { beginAtZero: true, max: 1, ticks: { color: chartTickColor }, grid: { color: chartGridColor } },
-    },
-  }), [chartGridColor, chartTextColor, chartTickColor])
+  const chartOptions = useMemo(() => buildRadarOptions(), [])
 
-  const barOptions = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: true,
-    indexAxis: 'y',
-    plugins: {
-      legend: { position: 'top', labels: { color: chartTextColor } },
-    },
-    scales: {
-      x: { ticks: { color: chartTickColor }, grid: { color: chartGridColor } },
-      y: { ticks: { color: chartTickColor } },
-    },
-  }), [chartGridColor, chartTextColor, chartTickColor])
+  const barOptions = useMemo(() => buildBarOptions(), [])
 
   function handleTabsKeyDown(event, currentTabId) {
     const currentIndex = tabIds.indexOf(currentTabId)
@@ -723,76 +712,66 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
   }
 
   return (
-    <div className="page-content fade-in">
-      {/* Export Button */}
-      <div className="analysis-controls">
-        <button 
-          className={`export-btn ${exporting ? 'loading' : ''}`}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className="space-y-6"
+    >
+      <div className="flex justify-end">
+        <Button
+          className="h-10"
           onClick={exportToPDF}
           disabled={exporting}
           title="Export analysis as PDF"
         >
-          <span className="export-icon">📥</span>
           {exporting ? 'Generating PDF...' : 'Export as PDF'}
-        </button>
+        </Button>
       </div>
 
-      <section className="analysis-header">
-        <div className="cluster-badge">
-          <h2>{result.style_cluster.label}</h2>
-          <div className="confidence-bar">
-            <div className="confidence-fill" style={{ width: `${clusterConfidence}%` }}></div>
-          </div>
-          <p>
-            {clusterConfidence.toFixed(1)}%
-            {' '}
-            <span className="tooltip-wrap">
-              <span className="tooltip-label" tabIndex={0} aria-describedby="cluster-confidence-tip">
-                Cluster Confidence (Calibrated)
-              </span>
-              <span className="tooltip-bubble" id="cluster-confidence-tip" role="tooltip">
-                {clusterConfidenceTooltip}
-              </span>
+      <Card variant="level3" className="space-y-3">
+        <h2 className={typographyTokens.sectionHeader}>{result.style_cluster.label}</h2>
+        <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+          <div className="h-full rounded-full bg-gradient-to-r from-primary to-accent" style={{ width: `${clusterConfidence}%` }}></div>
+        </div>
+        <p className="text-[13px] text-text-secondary">
+          {clusterConfidence.toFixed(1)}%
+          {' '}
+          <span className="tooltip-wrap">
+            <span className="tooltip-label" tabIndex={0} aria-describedby="cluster-confidence-tip">
+              Cluster Confidence (Calibrated)
             </span>
-            {` • ${confidenceLabel}`}
-            {hasRawClusterConfidence ? ` (Raw ${clusterRawConfidence.toFixed(1)}%)` : ''}
-          </p>
-        </div>
-      </section>
+            <span className="tooltip-bubble" id="cluster-confidence-tip" role="tooltip">
+              {clusterConfidenceTooltip}
+            </span>
+          </span>
+          {` | ${confidenceLabel}`}
+          {hasRawClusterConfidence ? ` (Raw ${clusterRawConfidence.toFixed(1)}%)` : ''}
+        </p>
+      </Card>
 
-      <div className="tabs-container">
-        <div className="tabs" role="tablist" aria-label="Analysis sections">
-          {ANALYSIS_TABS.map((tab) => {
-            const isActive = activeTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                id={`analysis-tab-${tab.id}`}
-                role="tab"
-                aria-selected={isActive}
-                aria-controls={`analysis-panel-${tab.id}`}
-                tabIndex={isActive ? 0 : -1}
-                className={`tab ${isActive ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-                onKeyDown={(event) => handleTabsKeyDown(event, tab.id)}
-              >
-                {tab.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      <TabBar
+        tabs={ANALYSIS_TABS}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        onKeyDown={handleTabsKeyDown}
+      />
 
-      <div className="tab-content">
+      <div>
         {activeTab === 'dna' && (
-          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-dna" aria-labelledby="analysis-tab-dna" tabIndex={0}>
+          <section className="tab-pane" role="tabpanel" id="analysis-panel-dna" aria-labelledby="analysis-tab-dna" tabIndex={0}>
             <h3>Your Sound DNA Profile</h3>
             <p className="mood-style">
               Mood: <strong>{result.sound_dna.mood || 'Unknown'}</strong> | Production: <strong>{result.sound_dna.production_style || 'Unknown'}</strong>
             </p>
-            <div className="chart-container">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5 }}
+              className="chart-container"
+            >
               <Radar data={soundDnaData} options={chartOptions} />
-            </div>
+            </motion.div>
             <div className="features-grid">
               {numericSoundDnaEntries.map(([key, value]) => (
                 <div key={key} className="feature-card">
@@ -805,7 +784,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         )}
 
         {activeTab === 'similar' && (
-          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-similar" aria-labelledby="analysis-tab-similar" tabIndex={0}>
+          <section className="tab-pane" role="tabpanel" id="analysis-panel-similar" aria-labelledby="analysis-tab-similar" tabIndex={0}>
             <h3>Top Similar Tracks</h3>
             <div className="similar-list">
               {(result.top_similar || []).map((item, idx) => (
@@ -817,10 +796,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                     <span className="cluster-tag">{item.cluster || 'N/A'}</span>
                   </div>
                   <div className="similarity-score">
-                    <div className="score-bar">
-                      <div className="score-fill" style={{ width: `${item.similarity || 0}%` }}></div>
-                    </div>
-                    <span>{(item.similarity || 0).toFixed(1)}%</span>
+                    <ProgressBar value={item.similarity || 0} />
                   </div>
                 </div>
               ))}
@@ -829,7 +805,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         )}
 
         {activeTab === 'difference' && (
-          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-difference" aria-labelledby="analysis-tab-difference" tabIndex={0}>
+          <section className="tab-pane" role="tabpanel" id="analysis-panel-difference" aria-labelledby="analysis-tab-difference" tabIndex={0}>
             <h3>How You Compare</h3>
             {differences.length > 0 && (
               <div className="chart-container">
@@ -856,45 +832,46 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         )}
 
         {activeTab === 'paths' && (
-          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-paths" aria-labelledby="analysis-tab-paths" tabIndex={0}>
+          <section className="tab-pane" role="tabpanel" id="analysis-panel-paths" aria-labelledby="analysis-tab-paths" tabIndex={0}>
             <h3>Your Creative Paths</h3>
             <div className="paths-grid">
-              {(result.paths || []).map((path) => (
-                <div key={path.id} className="path-card">
-                  <div className="path-header">
-                    <span className="path-number">{path.id || '1'}</span>
-                    <h4>{path.title || 'Untitled Path'}</h4>
+              {(result.paths || []).map((path, index) => (
+                <motion.div key={path.id} whileHover={{ scale: 1.01, transition: { duration: 0.15 } }}>
+                  <div className="path-card">
+                    <div className={`path-accent ${index === 0 ? 'path-accent-a' : index === 1 ? 'path-accent-b' : 'path-accent-c'}`}></div>
+                    <div className="path-header">
+                      <span className="path-number">{path.id || '1'}</span>
+                      <h4>{path.title || 'Untitled Path'}</h4>
+                    </div>
+                    <p className="path-strategy"><strong>Strategy:</strong> {path.strategy || 'Strategy not available'}</p>
+                    <p className="path-expected"><strong>Expected:</strong> {path.expected || 'Expected outcome not available'}</p>
+                    <p className="path-tradeoff"><strong>Tradeoff:</strong> {path.tradeoff || 'Tradeoff not available'}</p>
+                    <div className="path-actions">
+                      <strong>Actions:</strong>
+                      <ul>
+                        {(path.actions || []).map((action, idx) => (
+                          <li key={idx}>{action}</li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
-                  <p className="path-strategy"><strong>Strategy:</strong> {path.strategy || 'Strategy not available'}</p>
-                  <p className="path-expected"><strong>Expected:</strong> {path.expected || 'Expected outcome not available'}</p>
-                  <p className="path-tradeoff"><strong>Tradeoff:</strong> {path.tradeoff || 'Tradeoff not available'}</p>
-                  <div className="path-actions">
-                    <strong>Actions:</strong>
-                    <ul>
-                      {(path.actions || []).map((action, idx) => (
-                        <li key={idx}>{action}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
+                </motion.div>
               ))}
             </div>
 
             <div className="creative-ai-actions">
-              <button className="history-view-btn" onClick={runCreativePathsAiSummary} disabled={pathsAiLoading}>
+              <Button onClick={runCreativePathsAiSummary} disabled={pathsAiLoading}>
                 {pathsAiLoading ? 'Generating AI Summary...' : 'AI Summary For All 3 Paths'}
-              </button>
+              </Button>
             </div>
 
             {pathsAiError && <div className="error-message">{pathsAiError}</div>}
 
             {activeCreativePath && (
-              <div className="creative-ai-slider-panel slide-up">
+              <div className="creative-ai-slider-panel">
                 <div className="creative-ai-slider-top">
                   <h4>AI Summary: Creative Paths</h4>
-                  <span className={`explainability-source source-${pathsAiResult?.source || 'ml-local'}`}>
-                    {pathsAiResult?.source === 'openai' ? 'OpenAI summary layer' : 'ML local summary'}
-                  </span>
+                  <Badge variant="local">Local analysis</Badge>
                 </div>
 
                 <div className="creative-ai-slider-shell">
@@ -904,7 +881,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                     disabled={creativePathCards.length <= 1}
                     aria-label="Previous creative path summary"
                   >
-                    ◀
+                    Prev
                   </button>
 
                   <article className="creative-ai-card">
@@ -952,7 +929,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                     disabled={creativePathCards.length <= 1}
                     aria-label="Next creative path summary"
                   >
-                    ▶
+                    Next
                   </button>
                 </div>
 
@@ -969,23 +946,21 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                   </div>
                 )}
 
-                <p className="creative-ai-disclaimer">
-                  {pathsAiResult?.disclaimer || 'AI summary generated from your current analysis outcomes.'}
-                </p>
+                <p className="creative-ai-disclaimer">Local analysis</p>
               </div>
             )}
           </section>
         )}
 
         {activeTab === 'market' && (
-          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-market" aria-labelledby="analysis-tab-market" tabIndex={0}>
+          <section className="tab-pane" role="tabpanel" id="analysis-panel-market" aria-labelledby="analysis-tab-market" tabIndex={0}>
             <h3>Market Opportunities</h3>
             <div className="market-gaps">
               {(result.market_gaps && result.market_gaps.length > 0) ? (
                 <div className="gaps-list">
                   {result.market_gaps.map((gap, idx) => (
                     <div key={idx} className="gap-item">
-                      <span className="gap-icon">💡</span>
+                      <span className="gap-icon">Hint</span>
                       <p>{gap || 'Opportunity not specified'}</p>
                     </div>
                   ))}
@@ -998,30 +973,23 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         )}
 
         {activeTab === 'simulator' && (
-          <section className="tab-pane slide-up" role="tabpanel" id="analysis-panel-simulator" aria-labelledby="analysis-tab-simulator" tabIndex={0}>
+          <section className="tab-pane" role="tabpanel" id="analysis-panel-simulator" aria-labelledby="analysis-tab-simulator" tabIndex={0}>
             <h3>A/B Trajectory Simulator</h3>
             <p className="mood-style">Adjust selected features in small increments and simulate how your cluster fit, similarity, and market opportunity may shift before re-producing.</p>
 
             <div className="simulator-grid">
               {SIMULATOR_CONTROLS.map((control) => (
-                <div className="sim-control" key={control.feature}>
-                  <div className="sim-control-header">
-                    <span>{control.label}</span>
-                    <span className="sim-delta">{formatDelta(control.feature, adjustments[control.feature] || 0)}</span>
-                  </div>
-                  <div className="sim-control-base">
-                    Baseline: {Number(baseFeatures[control.feature] ?? 0).toFixed(control.feature === 'tempo' ? 1 : 3)}
-                  </div>
-                  <input
-                    type="range"
-                    min={control.min}
-                    max={control.max}
-                    step={control.step}
-                    value={adjustments[control.feature]}
-                    onChange={(e) => updateAdjustment(control.feature, e.target.value)}
-                    className="sim-slider"
-                  />
-                </div>
+                <SliderInput
+                  key={control.feature}
+                  id={`slider-${control.feature}`}
+                  label={control.label}
+                  value={adjustments[control.feature]}
+                  min={control.min}
+                  max={control.max}
+                  step={control.step}
+                  detail={formatDelta(control.feature, adjustments[control.feature] || 0)}
+                  onChange={(e) => updateAdjustment(control.feature, e.target.value)}
+                />
               ))}
             </div>
 
@@ -1038,23 +1006,23 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                   <option value="similarity">Max Similarity</option>
                   <option value="opportunity">Max Opportunity</option>
                 </select>
-                <button className="history-view-btn" onClick={runAutoOptimize} disabled={optLoading || simLoading}>
+                <Button onClick={runAutoOptimize} disabled={optLoading || simLoading}>
                   {optLoading ? 'Optimizing...' : 'Auto-optimize Deltas'}
-                </button>
+                </Button>
               </div>
-              <button className="history-view-btn" onClick={runSimulator} disabled={simLoading}>
+              <Button variant="primary" onClick={runSimulator} disabled={simLoading}>
                 {simLoading ? 'Running Simulation...' : 'Run A/B Simulation'}
-              </button>
-              <button className="sim-reset-btn" onClick={resetSimulator} disabled={simLoading || optLoading}>
+              </Button>
+              <Button className="sim-reset-btn" onClick={resetSimulator} disabled={simLoading || optLoading}>
                 Reset Adjustments
-              </button>
+              </Button>
             </div>
 
             {simError && <div className="error-message">{simError}</div>}
 
             {simulatorMode === 'optimize' && optResult && (
               <div className="sim-results">
-                <div className="sim-insights" style={{ marginBottom: '1rem' }}>
+                <div className="sim-insights mb-4">
                   <h4>Auto-optimize Projection</h4>
                   <ul>
                     <li>Objective: {optResult.objective === 'opportunity' ? 'Max Opportunity' : 'Max Similarity'}</li>
@@ -1068,29 +1036,29 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
 
                   {optimizeProjection && (
                     <>
-                      <div className="sim-kpi-grid" style={{ marginTop: '0.9rem' }}>
-                        <div className="sim-kpi-card">
+                      <div className="sim-kpi-grid mt-4">
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }} className="sim-kpi-card">
                           <h4>Cluster</h4>
                           <p>{optimizeProjection.before.style_cluster.label}</p>
-                          <span>→ {optimizeProjection.after.style_cluster.label}</span>
-                        </div>
-                        <div className="sim-kpi-card">
+                          <span>to {optimizeProjection.after.style_cluster.label}</span>
+                        </motion.div>
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.08 }} className="sim-kpi-card">
                           <h4>Avg Similarity</h4>
                           <p>{optimizeProjection.before.avg_similarity.toFixed(2)}%</p>
                           <span className={optimizeProjection.similarity_delta >= 0 ? 'sim-positive' : 'sim-negative'}>
                             {optimizeProjection.similarity_delta >= 0 ? '+' : ''}{optimizeProjection.similarity_delta.toFixed(2)}
                           </span>
-                        </div>
-                        <div className="sim-kpi-card">
+                        </motion.div>
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }} className="sim-kpi-card">
                           <h4>Opportunity Score</h4>
                           <p>{formatOpportunity(optimizeProjection.before.opportunity_score)}</p>
                           <span className={optimizeProjection.opportunity_delta >= 0 ? 'sim-positive' : 'sim-negative'}>
                             {optimizeProjection.opportunity_delta >= 0 ? '+' : ''}{formatOpportunity(optimizeProjection.opportunity_delta)}
                           </span>
-                        </div>
+                        </motion.div>
                       </div>
 
-                      <h5 style={{ marginTop: '0.9rem' }}>Projected insights</h5>
+                      <h5 className="mt-4">Projected insights</h5>
                       <ul>
                         {(optimizeProjection.insights || []).map((line, idx) => (
                           <li key={idx}>{line}</li>
@@ -1114,10 +1082,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                           <span className="cluster-tag">{item.cluster || 'N/A'}</span>
                         </div>
                         <div className="similarity-score">
-                          <div className="score-bar">
-                            <div className="score-fill" style={{ width: `${item.similarity || 0}%` }}></div>
-                          </div>
-                          <span>{(item.similarity || 0).toFixed(1)}%</span>
+                          <ProgressBar value={item.similarity || 0} />
                         </div>
                       </div>
                     ))}
@@ -1129,25 +1094,25 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
             {simulatorMode === 'simulate' && simResult && (
               <div className="sim-results">
                 <div className="sim-kpi-grid">
-                  <div className="sim-kpi-card">
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }} className="sim-kpi-card">
                     <h4>Cluster</h4>
                     <p>{simResult.before.style_cluster.label}</p>
-                    <span>→ {simResult.after.style_cluster.label}</span>
-                  </div>
-                  <div className="sim-kpi-card">
+                    <span>to {simResult.after.style_cluster.label}</span>
+                  </motion.div>
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.08 }} className="sim-kpi-card">
                     <h4>Avg Similarity</h4>
                     <p>{simResult.before.avg_similarity.toFixed(2)}%</p>
                     <span className={simResult.similarity_delta >= 0 ? 'sim-positive' : 'sim-negative'}>
                       {simResult.similarity_delta >= 0 ? '+' : ''}{simResult.similarity_delta.toFixed(2)}
                     </span>
-                  </div>
-                  <div className="sim-kpi-card">
+                  </motion.div>
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }} className="sim-kpi-card">
                     <h4>Opportunity Score</h4>
                     <p>{formatOpportunity(simResult.before.opportunity_score)}</p>
                     <span className={simResult.opportunity_delta >= 0 ? 'sim-positive' : 'sim-negative'}>
                       {simResult.opportunity_delta >= 0 ? '+' : ''}{formatOpportunity(simResult.opportunity_delta)}
                     </span>
-                  </div>
+                  </motion.div>
                 </div>
 
                 <div className="sim-insights">
@@ -1171,10 +1136,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                         <span className="cluster-tag">{item.cluster || 'N/A'}</span>
                       </div>
                       <div className="similarity-score">
-                        <div className="score-bar">
-                          <div className="score-fill" style={{ width: `${item.similarity || 0}%` }}></div>
-                        </div>
-                        <span>{(item.similarity || 0).toFixed(1)}%</span>
+                        <ProgressBar value={item.similarity || 0} />
                       </div>
                     </div>
                   ))}
@@ -1184,6 +1146,6 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
           </section>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }
