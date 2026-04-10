@@ -47,7 +47,6 @@ const ANALYSIS_TABS = [
   { id: 'similar', label: 'Similar Artists' },
   { id: 'difference', label: 'Differences' },
   { id: 'paths', label: 'Creative Paths' },
-  { id: 'market', label: 'Market Gap' },
   { id: 'simulator', label: 'A/B Simulator' },
 ]
 
@@ -100,10 +99,8 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
   }
 
   const clusterConfidence = Number(result.style_cluster?.confidence ?? 0)
-  const clusterRawConfidence = Number(result.style_cluster?.raw_confidence ?? clusterConfidence)
-  const hasRawClusterConfidence = Number.isFinite(Number(result.style_cluster?.raw_confidence))
   const confidenceLabel = clusterConfidence >= 75 ? 'High Certainty' : clusterConfidence >= 50 ? 'Medium Certainty' : 'Low Certainty'
-  const clusterConfidenceTooltip = 'Calibrated confidence estimates how reliably this track fits the assigned style cluster based on held-out data.'
+  const clusterConfidenceTooltip = 'Confidence estimates how strongly this track matches its predicted style cluster.'
   const recommendationConfidenceTooltip = 'Heuristic confidence estimates how stable and trustworthy the recommendation explanation is, not the cluster assignment certainty.'
   const tabIds = useMemo(() => ANALYSIS_TABS.map((tab) => tab.id), [])
 
@@ -252,9 +249,6 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
       writeKV('Generated', generatedAt)
       writeKV('Cluster', result.style_cluster.label)
       writeKV('Cluster confidence', `${clusterConfidence.toFixed(1)}%`)
-      if (hasRawClusterConfidence) {
-        writeKV('Raw cluster confidence', `${clusterRawConfidence.toFixed(1)}%`)
-      }
       writeKV('Mood / Production', `${result.sound_dna.mood} / ${result.sound_dna.production_style}`)
 
       writeSectionTitle('Sound DNA Snapshot')
@@ -305,10 +299,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         }
       }
 
-      writeSectionTitle('Market Gaps & Strategic Paths')
-      writeWrapped('Market gaps:')
-      writeBullets(result.market_gaps || ['No market gaps available.'])
-      writeWrapped('Strategic paths:')
+      writeSectionTitle('Strategic Paths')
       for (const path of result.paths || []) {
         writeKV(`${path.id} - ${path.title}`, path.strategy)
         writeWrapped(`Expected: ${path.expected}`, 9, [88, 96, 124], 4.5)
@@ -593,7 +584,6 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
         body: {
           sound_dna: result.sound_dna,
           style_cluster: result.style_cluster,
-          market_gaps: result.market_gaps || [],
           paths: result.paths || [],
           differences: (result.differences || []).slice(0, 6),
         },
@@ -720,6 +710,7 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
     >
       <div className="flex justify-end">
         <Button
+          variant="primary"
           className="h-10"
           onClick={exportToPDF}
           disabled={exporting}
@@ -739,14 +730,13 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
           {' '}
           <span className="tooltip-wrap">
             <span className="tooltip-label" tabIndex={0} aria-describedby="cluster-confidence-tip">
-              Cluster Confidence (Calibrated)
+              Cluster Confidence
             </span>
             <span className="tooltip-bubble" id="cluster-confidence-tip" role="tooltip">
               {clusterConfidenceTooltip}
             </span>
           </span>
           {` | ${confidenceLabel}`}
-          {hasRawClusterConfidence ? ` (Raw ${clusterRawConfidence.toFixed(1)}%)` : ''}
         </p>
       </Card>
 
@@ -949,26 +939,6 @@ export default function AnalysisPage({ result, theme = 'dark', token }) {
                 <p className="creative-ai-disclaimer">Local analysis</p>
               </div>
             )}
-          </section>
-        )}
-
-        {activeTab === 'market' && (
-          <section className="tab-pane" role="tabpanel" id="analysis-panel-market" aria-labelledby="analysis-tab-market" tabIndex={0}>
-            <h3>Market Opportunities</h3>
-            <div className="market-gaps">
-              {(result.market_gaps && result.market_gaps.length > 0) ? (
-                <div className="gaps-list">
-                  {result.market_gaps.map((gap, idx) => (
-                    <div key={idx} className="gap-item">
-                      <span className="gap-icon">Hint</span>
-                      <p>{gap || 'Opportunity not specified'}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="no-gaps">No market gaps detected for your current profile.</p>
-              )}
-            </div>
           </section>
         )}
 

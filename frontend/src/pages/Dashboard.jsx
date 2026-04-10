@@ -75,7 +75,7 @@ export default function Dashboard({ user, token, onLogout, theme, onToggleTheme 
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className={`flex h-screen overflow-hidden ${theme === 'dark' ? 'bg-[#0A0B14] text-white' : 'bg-[#F3F6FF] text-[#111827]'}`}
     >
-      <aside className={`hidden w-[220px] flex-shrink-0 flex-col gap-2 px-4 py-6 md:flex ${theme === 'dark' ? 'border-r border-white/[0.07] bg-[#111827]' : 'border-r border-[#DCE3F2] bg-white'}`}>
+      <aside className={`hidden w-[260px] flex-shrink-0 flex-col gap-2 px-5 py-6 md:flex ${theme === 'dark' ? 'border-r border-white/[0.07] bg-[#111827]' : 'border-r border-[#DCE3F2] bg-white'}`}>
         <div className="mb-6">
           <span className="text-[18px] font-semibold text-[#8B7CF6]">MusicGrowth.AI</span>
           <p className={`mt-0.5 text-[12px] ${theme === 'dark' ? 'text-[#5B6278]' : 'text-[#6B7280]'}`}>Find your sound. Choose your path.</p>
@@ -111,7 +111,7 @@ export default function Dashboard({ user, token, onLogout, theme, onToggleTheme 
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className={`flex h-[60px] flex-shrink-0 items-center justify-end gap-4 px-8 ${theme === 'dark' ? 'border-b border-white/[0.07] bg-[#111827]' : 'border-b border-[#DCE3F2] bg-white'}`}>
           <button
-            className={`h-8 rounded-lg px-3 text-[13px] transition-colors ${theme === 'dark' ? 'border border-white/20 text-[#9CA3AF] hover:bg-white/5 hover:text-white' : 'border border-[#CBD5E1] text-[#4B5563] hover:bg-[#F3F4F6]'}`}
+            className="h-8 rounded-lg bg-gradient-to-r from-[#6C5CE7] to-[#00CEC9] px-3 text-[13px] font-medium text-white shadow-[0_8px_20px_rgba(108,92,231,0.28)] transition-all hover:opacity-90"
             onClick={onToggleTheme}
           >
             {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}

@@ -85,7 +85,7 @@ export default function HistoryPage({ history, onViewAnalysis, error, onRetry, l
                   <div className="flex items-center justify-start gap-2 md:justify-end">
                     <Badge variant="subtle">{analysis.result?.sound_dna?.mood || 'Unknown'}</Badge>
                     <Badge variant="subtle">{analysis.result?.sound_dna?.production_style || 'Unknown'}</Badge>
-                    <Button className="h-8 px-3 text-sm" onClick={() => onViewAnalysis(analysis)}>
+                    <Button variant="primary" className="h-8 px-3 text-sm" onClick={() => onViewAnalysis(analysis)}>
                       View Details
                     </Button>
                   </div>

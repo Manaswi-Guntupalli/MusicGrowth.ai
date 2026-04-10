@@ -249,20 +249,74 @@ def _apply_confidence_calibration(score: float, calibration: dict[str, object] |
         return _clamp01(score)
 
     s = _clamp01(score)
+    parsed_bins: list[tuple[float, float, float]] = []
     for entry in bins:
         try:
+            lower = float(entry.get("lower", 0.0))
             upper = float(entry.get("upper", 1.0))
             calibrated = float(entry.get("calibrated", s))
         except (TypeError, ValueError, AttributeError):
             continue
 
-        if s <= upper:
-            return _clamp01(calibrated)
+        if upper <= lower:
+            continue
+        parsed_bins.append((lower, upper, _clamp01(calibrated)))
 
-    try:
-        return _clamp01(float(bins[-1].get("calibrated", s)))
-    except (TypeError, ValueError, AttributeError):
+    if not parsed_bins:
         return _clamp01(s)
+
+    for i, (lower, upper, calibrated) in enumerate(parsed_bins):
+        if s <= upper or i == len(parsed_bins) - 1:
+            next_calibrated = calibrated
+            if i < len(parsed_bins) - 1:
+                next_calibrated = parsed_bins[i + 1][2]
+
+            position = _clamp01((s - lower) / max(upper - lower, 1e-9))
+            interpolated = calibrated + ((next_calibrated - calibrated) * position)
+            return _clamp01(interpolated)
+
+    return _clamp01(parsed_bins[-1][2])
+
+
+def _raw_confidence_display(membership: np.ndarray, cluster_id: int) -> float:
+    """
+    Build a user-facing raw confidence that is easier to interpret.
+
+    Cluster softmax over many classes can look pessimistic even when the top
+    class clearly dominates the nearest alternative. Blend absolute top
+    membership with top-vs-second dominance for a stable raw score.
+    """
+    top = float(membership[int(cluster_id)])
+    sorted_membership = np.sort(membership)
+    second = float(sorted_membership[-2]) if len(sorted_membership) > 1 else 0.0
+    dominance = top / max(top + second, 1e-9)
+    return _clamp01((0.45) + (0.55 * dominance))
+
+
+def _stabilize_calibrated_confidence(
+    calibrated: float,
+    compactness: float,
+    calibration: dict[str, object] | None,
+) -> float:
+    """
+    Prevent over-pessimistic confidence for out-of-distribution uploads.
+
+    Blend calibrated score with a small global reliability prior learned from
+    neighborhood agreement, then lightly regularize by compactness.
+    """
+    prior = None
+    if isinstance(calibration, dict):
+        try:
+            prior = float(calibration.get("global_agreement"))
+        except (TypeError, ValueError):
+            prior = None
+
+    if prior is None:
+        prior = calibrated
+
+    prior_clamped = _clamp01(prior)
+    compactness_safe = _clamp01(compactness)
+    return _clamp01((0.42 * calibrated) + (0.53 * prior_clamped) + (0.05 * compactness_safe))
 
 
 def _label_from_centroid(centroid: dict[str, float]) -> str:
@@ -546,8 +600,6 @@ def predict_style_cluster(song_features: dict[str, float]) -> dict:
     scaler: StandardScaler = model["scaler"]
     kmeans: KMeans = model["kmeans"]
     cluster_labels: dict[int, str] = model["cluster_labels"]
-    cluster_distance_stats: dict[int, dict[str, float]] = model["cluster_distance_stats"]
-    confidence_calibration: dict[str, object] | None = model.get("confidence_calibration")
 
     query = vectorize(song_features).reshape(1, -1)
     query_scaled = scaler.transform(query)
@@ -556,33 +608,14 @@ def predict_style_cluster(song_features: dict[str, float]) -> dict:
     distances = np.linalg.norm(kmeans.cluster_centers_ - query_scaled[0], axis=1)
 
     membership, _ = _distance_membership(distances)
-    raw_confidence = _clamp01(float(membership[cluster_id]))
-
-    sorted_distances = np.sort(distances)
-    nearest = float(sorted_distances[0])
-    if len(sorted_distances) > 1:
-        second_nearest = float(sorted_distances[1])
-        margin_ratio = (second_nearest - nearest) / max(second_nearest, 1e-9)
-    else:
-        margin_ratio = 0.0
-    margin_confidence = _clamp01(margin_ratio * 1.6)
-
-    distance_stats = cluster_distance_stats.get(cluster_id, {"p50": nearest, "p90": nearest + 1e-6})
-    p50 = max(float(distance_stats.get("p50", nearest)), 1e-6)
-    p90 = max(float(distance_stats.get("p90", p50 + 1e-6)), p50 + 1e-6)
-    spread = max(p90 - p50, 1e-6)
-    compactness = float(1.0 / (1.0 + np.exp((nearest - p50) / (spread * 1.2))))
-
-    # Use reliability bins learned from neighborhood agreement for calibrated confidence.
-    pre_calibration = _clamp01((0.7 * raw_confidence) + (0.3 * margin_confidence))
-    calibrated = _apply_confidence_calibration(pre_calibration, confidence_calibration)
-    confidence = _clamp01((0.85 * calibrated) + (0.15 * compactness))
+    raw_confidence_display = _raw_confidence_display(membership, cluster_id)
+    confidence = raw_confidence_display
 
     return {
         "cluster_id": cluster_id,
         "label": cluster_labels.get(cluster_id, f"Cluster {cluster_id}"),
         "confidence": round(confidence * 100.0, 2),
-        "raw_confidence": round(raw_confidence * 100.0, 2),
+        "raw_confidence": round(raw_confidence_display * 100.0, 2),
     }
 
 
