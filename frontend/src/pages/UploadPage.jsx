@@ -7,6 +7,18 @@ export default function UploadPage({ token, onAnalysisComplete, onAnalysisStateC
   const [segmentMode, setSegmentMode] = useState('best')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [spokenWordWarning, setSpokenWordWarning] = useState('')
+
+  function isSpokenWordGuardrailError(err) {
+    const rawMessage = String(err?.message || '').trim()
+    return /SPOKEN_WORD_DETECTED/i.test(rawMessage)
+  }
+
+  function toSpokenWordGuardrailMessage(err) {
+    const rawMessage = String(err?.message || '').trim()
+    const normalized = rawMessage.replace(/^SPOKEN_WORD_DETECTED:\s*/i, '').trim()
+    return normalized || 'This audio appears to be spoken-word heavy. Music analysis may be unreliable for this upload.'
+  }
 
   function toUploadErrorMessage(err) {
     const rawMessage = String(err?.message || '').trim()
@@ -40,6 +52,41 @@ export default function UploadPage({ token, onAnalysisComplete, onAnalysisStateC
     return rawMessage || 'Could not analyze this file. Please try again.'
   }
 
+  async function runAnalyze(allowSpokenWord = false) {
+    if (!file) return
+
+    setLoading(true)
+    setError('')
+    if (!allowSpokenWord) {
+      setSpokenWordWarning('')
+    }
+    onAnalysisStateChange?.(true)
+
+    const form = new FormData()
+    form.append('file', file)
+
+    try {
+      const data = await requestJson(`/analyze?segment_mode=${segmentMode}&allow_spoken_word=${allowSpokenWord ? 'true' : 'false'}`, {
+        method: 'POST',
+        body: form,
+        token,
+        timeoutMs: 90000,
+        retries: 0,
+      })
+      setSpokenWordWarning('')
+      onAnalysisComplete(data)
+    } catch (err) {
+      if (isSpokenWordGuardrailError(err)) {
+        setSpokenWordWarning(toSpokenWordGuardrailMessage(err))
+      } else {
+        setError(toUploadErrorMessage(err))
+      }
+    } finally {
+      setLoading(false)
+      onAnalysisStateChange?.(false)
+    }
+  }
+
   async function handleAnalyze(e) {
     e.preventDefault()
     if (!file) {
@@ -47,28 +94,12 @@ export default function UploadPage({ token, onAnalysisComplete, onAnalysisStateC
       return
     }
 
-    setLoading(true)
-    setError('')
-    onAnalysisStateChange?.(true)
+    await runAnalyze(false)
+  }
 
-    const form = new FormData()
-    form.append('file', file)
-
-    try {
-      const data = await requestJson(`/analyze?segment_mode=${segmentMode}`, {
-        method: 'POST',
-        body: form,
-        token,
-        timeoutMs: 90000,
-        retries: 0,
-      })
-      onAnalysisComplete(data)
-    } catch (err) {
-      setError(toUploadErrorMessage(err))
-    } finally {
-      setLoading(false)
-      onAnalysisStateChange?.(false)
-    }
+  async function handleContinueAnyway() {
+    if (!file || loading) return
+    await runAnalyze(true)
   }
 
   return (
@@ -92,7 +123,11 @@ export default function UploadPage({ token, onAnalysisComplete, onAnalysisStateC
           <input
             type="file"
             accept=".mp3,.wav,.m4a,.flac,.ogg"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            onChange={(e) => {
+              setFile(e.target.files?.[0] || null)
+              setError('')
+              setSpokenWordWarning('')
+            }}
             className="hidden"
           />
         </label>
@@ -132,6 +167,32 @@ export default function UploadPage({ token, onAnalysisComplete, onAnalysisStateC
         >
           {loading ? 'Analyzing your sound...' : 'Analyze My Sound'}
         </button>
+
+        {spokenWordWarning ? (
+          <div className={`rounded-xl border p-4 ${theme === 'dark' ? 'border-amber-500/40 bg-amber-500/10' : 'border-amber-400/60 bg-amber-50'}`}>
+            <p className={`text-[13px] ${theme === 'dark' ? 'text-amber-200' : 'text-amber-800'}`}>
+              {spokenWordWarning}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleContinueAnyway}
+                disabled={loading}
+                className="h-9 rounded-lg bg-gradient-to-r from-[#F59E0B] to-[#F97316] px-4 text-[13px] font-medium text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Continue Anyway
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpokenWordWarning('')}
+                disabled={loading}
+                className={`h-9 rounded-lg border px-4 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${theme === 'dark' ? 'border-white/20 text-[#D1D5DB] hover:bg-white/5' : 'border-[#CBD5E1] text-[#4B5563] hover:bg-[#F3F4F6]'}`}
+              >
+                Choose Another Audio
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {error ? <p className="text-[13px] text-[#E17055]">{error}</p> : null}
       </form>

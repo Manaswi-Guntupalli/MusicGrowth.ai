@@ -13,10 +13,43 @@ from .similarity import (
 )
 from .strategy import build_differences, build_market_gaps, build_market_targets, build_paths
 
+SPOKEN_WORD_GUARDRAIL_CODE = "SPOKEN_WORD_DETECTED"
 
-def run_analysis(audio_path: str, segment_mode: str = "best") -> dict:
+
+def _is_likely_spoken_word(features: dict[str, float]) -> bool:
+    """
+    Heuristic guardrail for non-musical spoken-word uploads (e.g. podcasts).
+
+    We keep this conservative to avoid false blocks on vocal-heavy songs.
+    """
+    speechiness = float(features.get("speechiness", 0.0))
+    instrumentalness = float(features.get("instrumentalness", 0.0))
+    danceability = float(features.get("danceability", 0.0))
+    energy = float(features.get("energy", 0.0))
+
+    # Strong speech signal with low musical movement is likely spoken-word.
+    return (
+        speechiness >= 0.82
+        and instrumentalness <= 0.18
+        and danceability <= 0.42
+        and energy <= 0.58
+    )
+
+
+def run_analysis(
+    audio_path: str,
+    segment_mode: str = "best",
+    *,
+    allow_spoken_word: bool = False,
+) -> dict:
     raw = extract_features_from_path(audio_path, segment_mode=segment_mode)
     sound_dna_features = normalize_features(raw)
+
+    if not allow_spoken_word and _is_likely_spoken_word(sound_dna_features):
+        raise ValueError(
+            f"{SPOKEN_WORD_GUARDRAIL_CODE}: This audio appears to be spoken-word heavy (podcast/interview style). "
+            "Music analysis can be unreliable for this input."
+        )
 
     style_cluster = predict_style_cluster(sound_dna_features)
     top_refs = top_similar(sound_dna_features, cluster_id=style_cluster["cluster_id"], top_k=3)

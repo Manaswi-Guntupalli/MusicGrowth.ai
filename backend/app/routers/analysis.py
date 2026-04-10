@@ -114,6 +114,7 @@ def _validate_uploaded_audio_file(audio_path: str) -> None:
 async def analyze_song(
     file: UploadFile = File(...),
     segment_mode: str = "best",
+    allow_spoken_word: bool = False,
     current_user: dict = Depends(get_current_user),
 ) -> AnalysisResponse:
     extension = Path(file.filename or "upload").suffix.lower()
@@ -130,7 +131,11 @@ async def analyze_song(
         tmp_path, _ = await _write_upload_to_temp_file(file=file, suffix=suffix)
         _validate_uploaded_audio_file(tmp_path)
 
-        result = run_analysis(tmp_path, segment_mode=segment_mode)
+        result = run_analysis(
+            tmp_path,
+            segment_mode=segment_mode,
+            allow_spoken_word=allow_spoken_word,
+        )
         db = get_db()
         doc = {
             "user_id": ObjectId(current_user["id"]),
